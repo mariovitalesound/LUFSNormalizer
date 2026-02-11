@@ -1,0 +1,90 @@
+LUFS Normalizer v2.5.0 Release Notes
+=====================================
+
+Release Date: January 2026
+
+NEW FEATURES
+------------
+
+1. Expanded Preset System (10 Presets)
+   - Broadcast (US): -24 LUFS, -2 dBTP (ATSC A/85)
+   - Broadcast (EU): -23 LUFS, -1 dBTP (EBU R128)
+   - Streaming: -14 LUFS, -1 dBTP (Spotify/YouTube)
+   - Podcast: -16 LUFS, -1 dBTP (Apple Podcasts)
+   - Game (Console): -24 LUFS, -1 dBTP (ASWG Home)
+   - Game (Mobile): -18 LUFS, -1 dBTP (ASWG Portable)
+   - Film/Cinema: -24 LUFS, -2 dBTP (SMPTE RP 200)
+   - Music (Dynamic): -14 LUFS, -1 dBTP
+   - Music (Loud): -9 LUFS, -1 dBTP
+   - Cinema Dialog Ref: -27 LUFS, -2 dBTP (Netflix)
+
+2. User-Configurable Favorites System
+   - Pin 3-5 presets as main UI buttons
+   - "More..." button shows all 10 presets
+   - Star/unstar presets to add/remove from favorites
+   - "Manage Favorites" dialog for easy organization
+   - Favorites persist across app restarts
+
+3. Strict vs Drift Mode Toggle
+   - Strict LUFS (default): Skip files exceeding peak ceiling
+     Files copied to 'needs_limiting/' for manual processing
+     Guarantees exact target LUFS on all processed files
+
+   - Drift Mode: Reduce gain to protect peak ceiling
+     Final LUFS may undershoot target
+     No files are skipped - useful for batch workflows
+
+4. CSV Reason Column
+   - New 'reason' field in CSV output for automation/QC
+   - Values: 'ok', 'peak_limited', 'would_exceed_peak_ceiling',
+     'too_quiet', 'upsample_blocked'
+   - New 'target_lufs' column for reference
+
+5. Updated About Dialog
+   - Standards reference section
+   - Peak handling modes explanation
+   - Complete preset listing
+
+IMPROVEMENTS
+------------
+
+- Config schema updated with new fields:
+  - preset_name: Track last-used preset
+  - favorite_presets: User's favorite preset list
+  - strict_lufs_matching: Toggle strict/drift mode
+
+- Preset structure enhanced with:
+  - 'name': Display name
+  - 'description': Full description
+  - 'standard': Industry standard reference
+
+- Better preset matching: Checks both LUFS and peak values
+
+MIGRATION NOTES
+---------------
+
+- Old config.json files will be migrated automatically
+- Old preset names mapped to new ones:
+  - 'broadcast' -> 'broadcast_eu' (EBU R128)
+  - 'game' -> 'game_mobile' (ASWG Portable)
+
+- Default favorites: broadcast_us, streaming, podcast
+- Default mode: Strict LUFS matching (ON)
+
+TECHNICAL DETAILS
+-----------------
+
+Files modified:
+- normalize_lufs_core.py: Core engine v2.5.0
+- normalize_gui_modern.py: GUI v2.5.0
+- config.json: Updated schema
+
+Dependencies unchanged:
+- customtkinter
+- pyloudnorm
+- soundfile
+- numpy
+- soxr (optional, for VHQ resampling)
+
+=====================================
+Developed by Mario Vitale

@@ -1,0 +1,205 @@
+LUFS NORMALIZER v2.4.1 - PROFESSIONAL EDITION
+==============================================
+Release Date: January 2026
+
+CRITICAL FIXES FROM v2.4.0
+--------------------------
+
+v2.4.1 addresses critical DSP issues identified in technical review:
+
+1. RENAMED "Safety Limiter" to "Enforce Peak Ceiling"
+   
+   The previous "Safety Limiter" was misleading. A real limiter (L2, Pro-L)
+   uses lookahead and envelopes to squash ONLY the peaks while preserving
+   average loudness (LUFS).
+   
+   Our implementation reduces the ENTIRE FILE's gain, which sacrifices the
+   LUFS target for peak compliance. This is now clearly communicated:
+   
+   - UI label: "Enforce Peak Ceiling (reduce gain if True Peak exceeds limit)"
+   - Warning shown: "⚠️ LUFS target may NOT be met when peaks are reduced!"
+   - Confirmation dialog before processing when enabled
+
+2. SAFETY CHECK NOW USES TRUE PEAK (not Sample Peak)
+   
+   BEFORE (v2.4.0 - BROKEN):
+   ```python
+   peak = np.max(np.abs(audio_data))  # Sample Peak - WRONG!
+   ```
+   
+   AFTER (v2.4.1 - CORRECT):
+   ```python
+   peak = measure_true_peak(audio_data, sample_rate)  # True Peak via 4x oversample
+   ```
+   
+   This was a critical bug. A file could have:
+   - Sample Peak: -0.5 dBFS (passes old check)
+   - True Peak: +0.2 dBTP (fails broadcast QC)
+   
+   Now the safety check correctly uses True Peak measurement.
+
+3. SOXR FOR TRUE PEAK MEASUREMENT (reduced scipy dependency)
+   
+   True Peak now uses SOXR for 4x oversampling instead of scipy.
+   Benefits:
+   - Consistent with resampling quality
+   - Smaller executable size
+   - Falls back to scipy if SOXR unavailable
+
+4. IMPROVED CLIPPING VISIBILITY
+   
+   Hard clipping is now:
+   - Logged at CRITICAL level
+   - Flagged with 'CLIPPED' status in CSV
+   - 'clipped' boolean column in report
+   - Clear guidance to enable ceiling enforcement
+
+
+FEATURE SUMMARY
+---------------
+
+TRUE PEAK MEASUREMENT (dBTP)
+- 4x oversampling via SOXR (ITU-R BS.1770-4)
+- Detects inter-sample peaks
+- Required for EBU R128 compliance
+
+TPDF DITHERING
+- Applied for 16/24-bit output
+- Eliminates quantization distortion
+- Industry standard for mastering
+
+PEAK CEILING ENFORCEMENT (Optional)
+- Reduces global gain if True Peak exceeds ceiling
+- ⚠️ SACRIFICES LUFS TARGET for peak compliance
+- NOT a limiter - global gain reduction
+- Use when peak compliance > exact LUFS
+
+SOXR VHQ RESAMPLING
+- Mastering-grade sample rate conversion
+- Downsample only (no upsampling)
+- Industry gold standard
+
+THREAD-SAFE PROCESSING
+- threading.Lock() prevents race conditions
+- Proper defensive programming
+
+
+CSV REPORT COLUMNS
+------------------
+
+v2.4.1 includes comprehensive reporting:
+
+| Column | Description |
+|--------|-------------|
+| filename | Source file name |
+| status | OK / PEAK_ADJUSTED / CLIPPED / BLOCKED |
+| sample_rate | Output sample rate |
+| bit_depth | Output bit depth |
+| original_lufs | Source loudness |
+| target_lufs | Requested target |
+| final_lufs | Actual output loudness |
+| lufs_delta | Difference from target |
+| normalization_gain_db | Gain for LUFS target |
+| ceiling_adjustment_db | Additional gain reduction for peaks |
+| total_gain_db | Total gain applied |
+| true_peak_dBTP | Final True Peak level |
+| clipped | Boolean - was hard clipping applied? |
+
+
+PROPER TERMINOLOGY
+------------------
+
+This tool does NOT include:
+- ❌ A limiter (no lookahead, no attack/release)
+- ❌ A compressor (no ratio, threshold, knee)
+- ❌ Brick wall limiting (not dynamic processing)
+
+This tool DOES include:
+- ✅ LUFS normalization (linear gain adjustment)
+- ✅ True Peak measurement (4x oversampling)
+- ✅ Peak ceiling enforcement (global gain reduction)
+- ✅ TPDF dithering (bit depth conversion)
+- ✅ SOXR resampling (sample rate conversion)
+
+
+INSTALLATION
+------------
+
+Required:
+    pip install customtkinter soundfile pyloudnorm numpy soxr
+
+Optional (fallback for True Peak if SOXR unavailable):
+    pip install scipy
+
+
+USAGE
+-----
+
+GUI:
+    python normalize_gui_modern.py
+
+CLI:
+    python normalize_lufs_core.py input/ output/ -t -23
+    python normalize_lufs_core.py input/ output/ -t -14 --enforce-ceiling
+
+Verification:
+    python verify_audio.py normalized_file.wav
+
+
+WHEN TO USE "ENFORCE PEAK CEILING"
+-----------------------------------
+
+USE IT WHEN:
+- Delivery spec requires True Peak ≤ -1.0 dBTP (most broadcast)
+- Peak compliance is MORE important than exact LUFS
+- Automated pipelines where files can't fail QC
+
+DON'T USE IT WHEN:
+- You need exact LUFS target (e.g., -23.0 ±0.5)
+- You'll manually review and adjust in DAW
+- Files already have reasonable headroom
+
+UNDERSTAND:
+- It's NOT a limiter - it reduces ENTIRE FILE gain
+- LUFS target will NOT be met if peaks are high
+- CSV report shows lufs_delta for verification
+
+
+BROADCAST COMPLIANCE
+--------------------
+
+✅ LUFS Measurement (ITU-R BS.1770-4)
+✅ True Peak Detection (dBTP via 4x oversample)
+✅ TPDF Dithering (professional bit reduction)
+✅ SOXR VHQ Resampling (mastering-grade)
+✅ Accurate Reporting (CSV with all metrics)
+
+
+VERSION HISTORY
+---------------
+
+v2.4.1 - CRITICAL FIXES
+  * Fixed: Safety check now uses True Peak (not Sample Peak)
+  * Fixed: Renamed "Limiter" to "Enforce Peak Ceiling" (accurate)
+  * Fixed: SOXR for True Peak (reduced scipy dependency)
+  * Fixed: Improved clipping visibility in reports
+  * Added: Clear warning that LUFS target may not be met
+
+v2.4.0 - PROFESSIONAL EDITION
+  + True Peak measurement (dBTP)
+  + TPDF dithering
+  + Safety limiter (mislabeled - fixed in 2.4.1)
+  + Threading lock
+
+v2.3.0 - ESSENTIALS
+  + Stripped down UI
+  + Upsample prevention
+
+v2.2.0 - SOXR
+  + SOXR VHQ resampling
+
+
+==============================================
+LUFS NORMALIZER v2.4.1 - NOW TRULY BROADCAST READY
+Accurate terminology. Correct DSP. Professional results.
+==============================================

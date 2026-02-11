@@ -1,0 +1,19 @@
+{
+    "input_folder": "I:/AudioWork/input_audio",
+    "output_folder": "J:/Audio_Exports",
+    "target_lufs": -24.0,
+    "peak_ceiling": -1.0,
+    "preset_name": "broadcast_us",
+    "favorite_presets": [
+        "broadcast_us",
+        "podcast",
+        "streaming"
+    ],
+    "strict_lufs_matching": true,
+    "auto_open_output": true,
+    "bit_depth": "preserve",
+    "sample_rate": "preserve",
+    "use_batch_folders": true,
+    "generate_log": true,
+    "generate_csv": true
+}

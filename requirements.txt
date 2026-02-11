@@ -1,0 +1,19 @@
+# LUFS Normalizer - Requirements
+# Python 3.8+
+
+# Core audio processing
+soundfile>=0.12.1
+pyloudnorm>=0.1.1
+numpy>=1.21.0
+
+# High-quality resampling (recommended)
+soxr>=0.3.0
+
+# GUI framework
+customtkinter>=5.2.0
+
+# Icon generation and display
+Pillow>=9.0.0
+
+# Optional: fallback resampling if soxr unavailable
+scipy>=1.7.0
