@@ -1,192 +1,320 @@
 # LUFS Normalizer
 
-**Professional Broadcast-Grade Audio Normalization Tool**
+Professional batch audio normalization for broadcast, game audio, and streaming. Normalizes WAV and AIFF files to industry-standard LUFS targets while respecting True Peak limits.
 
-Version 2.9.0 (GUI) | Engine v2.5.0
+**Version 3.0.1** | Author: Mario Vitale
 
----
+## Features
 
-## Overview
-
-LUFS Normalizer is a batch audio processing tool that normalizes audio files to industry-standard loudness levels (LUFS) while respecting True Peak limits. Designed for broadcast engineers, game audio professionals, podcast producers, and content creators who need consistent, compliant audio levels.
-
-### Key Features
-
-- **ITU-R BS.1770-4** integrated loudness measurement (pyloudnorm)
-- **True Peak detection** (dBTP) with 4x oversampling - EBU R128 compliant
-- **TPDF dithering** for professional bit depth reduction
-- **SOXR VHQ resampling** (mastering-grade quality)
-- **10 industry presets** covering broadcast, streaming, podcast, game, film, and music
-- **Batch processing** with detailed CSV/log reports
-- **Strict vs Drift mode** for flexible peak handling
-
----
-
-## Peak Handling Modes
-
-### Strict Mode (Default)
-
-When enabled, files that would exceed the True Peak ceiling after normalization are **skipped entirely**. They are copied to a `needs_limiting/` subfolder for manual processing with a limiter in your DAW.
-
-**Use case:** You need exact LUFS targets for broadcast compliance. No exceptions.
-
-**Behavior:**
-- File would exceed peak? → SKIP, copy to `needs_limiting/`
-- All processed files are guaranteed to hit the exact target LUFS
-- CSV report shows `reason: would_exceed_peak_ceiling` for skipped files
-
-### Drift Mode
-
-When Strict Mode is disabled, files that would exceed the peak ceiling have their **gain reduced** to protect the ceiling. The file is processed, but the final LUFS will undershoot the target.
-
-**Use case:** You want all files processed, even if some end up quieter than the target.
-
-**Behavior:**
-- File would exceed peak? → Reduce gain to stay under ceiling
-- Final LUFS may be quieter than target (e.g., -26 LUFS instead of -24 LUFS)
-- CSV report shows `reason: peak_limited` for these files
+- **LUFS normalization** per ITU-R BS.1770-4 (via pyloudnorm)
+- **True Peak measurement** (dBTP) with 4x oversampling via SOXR (scipy fallback)
+- **Loudness Range (LRA)** measurement per EBU R128 s1
+- **TPDF dithering** for bit depth reduction (16-bit, 24-bit)
+- **Sample rate conversion** via SOXR (VHQ quality, downsampling only)
+- **Parallel batch processing** using ProcessPoolExecutor
+- **BWF BEXT + iXML metadata** injection for WAV files
+- **Watch folder mode** with automatic processing of new files
+- **10 built-in presets** covering broadcast, streaming, game, film, and music
+- **Strict LUFS and Drift** peak handling modes
+- **PySide6 dark-themed GUI** with preset manager and real-time log
+- **CLI** for scripting and headless operation
+- **Single-file exe** build via PyInstaller
 
 ---
 
 ## Presets
 
-| Preset | LUFS | Peak | Standard |
-|--------|------|------|----------|
-| Broadcast (US) | -24 | -2.0 dBTP | ATSC A/85 |
-| Broadcast (EU) | -23 | -1.0 dBTP | EBU R128 |
-| Streaming | -14 | -1.0 dBTP | Spotify/YouTube |
-| Podcast | -16 | -1.0 dBTP | Apple Podcasts |
-| Game (Console) | -24 | -1.0 dBTP | ASWG-R001 Home |
-| Game (Mobile) | -18 | -1.0 dBTP | ASWG-R001 Portable |
-| Film / Cinema | -24 | -2.0 dBTP | SMPTE RP 200 |
-| Music (Dynamic) | -14 | -1.0 dBTP | Streaming optimized |
-| Music (Loud) | -9 | -1.0 dBTP | Contemporary pop/EDM |
-| Cinema Dialog Ref | -27 | -2.0 dBTP | Netflix 5.1 |
+| Key | Name | LUFS | Peak (dBTP) | Standard |
+|---|---|---|---|---|
+| `broadcast_us` | Broadcast (US) | -24.0 | -2.0 | ATSC A/85 |
+| `broadcast_eu` | Broadcast (EU) | -23.0 | -1.0 | EBU R128 |
+| `streaming` | Streaming | -14.0 | -1.0 | Spotify / YouTube / Amazon |
+| `podcast` | Podcast | -16.0 | -1.0 | Apple Podcasts |
+| `game_console` | Game (Console) | -24.0 | -1.0 | ASWG-R001 Home |
+| `game_mobile` | Game (Mobile) | -18.0 | -1.0 | ASWG-R001 Portable |
+| `film` | Film / Cinema | -24.0 | -2.0 | SMPTE RP 200 |
+| `music_dynamic` | Music (Dynamic) | -14.0 | -1.0 | Streaming optimized |
+| `music_loud` | Music (Loud) | -9.0 | -1.0 | Contemporary pop/EDM |
+| `reference_cinema` | Cinema Dialog Ref | -27.0 | -2.0 | Netflix 5.1 |
+
+The GUI displays up to 5 favorite presets as quick-select buttons. Use the Preset Manager to add, remove, and drag-reorder favorites.
 
 ---
 
-## Preset Manager
+## Peak Handling Modes
 
-The GUI includes a unified Preset Manager for selecting and organizing favorites.
+### Strict LUFS (default)
 
-### Features
+Files that would exceed the peak ceiling after normalization are **skipped**. The original file is copied to a `needs_limiting/` folder so you can apply a limiter in your DAW and re-process. Every normalized file is guaranteed to hit the exact target LUFS.
 
-- **Favorites Bar:** Up to 5 presets displayed on the main screen for quick access
-- **Drag-and-Drop Reordering:** Grab the handle icon to reorder favorites with a smooth "lift and drop" animation
-- **Live Validation:** Manually entering LUFS/Peak values that match a preset will automatically highlight that preset
-- **Apply & Close:** Selecting a preset and clicking "Apply" applies it and closes the manager
+### Drift Mode
 
-### Lift-and-Drop System
-
-The preset reordering uses a custom drag implementation:
-
-1. **Ghost Clone:** When dragging, a semi-transparent clone follows your cursor
-2. **Spacer Animation:** Other items shift to show the drop position ("parting the sea" effect)
-3. **Safe Release:** Global button release handling ensures clean drag termination
+Gain is reduced to keep the True Peak at or below the ceiling. The final LUFS may undershoot the target. Files are never skipped. The CSV report marks these as `OK_UNDERSHOOT` with reason `peak_limited`.
 
 ---
 
-## Installation
+## Supported Formats
 
-### Requirements
+- **Input:** `.wav`, `.WAV`, `.aiff`, `.AIFF`, `.aif`, `.AIF`
+- **Output:** Same format as input (WAV stays WAV, AIFF stays AIFF)
+- **Bit depth:** Preserve, 16-bit, 24-bit, or 32-bit (TPDF dither applied when reducing)
+- **Sample rate:** Preserve, 44100 Hz, or 48000 Hz (downsampling only, requires SOXR)
 
-- Python 3.8+
-- Windows / macOS / Linux
+---
 
-### Steps
+## Output Folder Structure
 
-1. Clone or download the repository:
-   ```bash
-   git clone https://github.com/yourusername/lufs-normalizer.git
-   cd lufs-normalizer
-   ```
+With batch folders enabled (default):
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```
+output/
+  batch_20260327_143000_-23LUFS/
+    normalized/
+      audio_-23LUFS.wav
+      speech_-23LUFS.wav
+    needs_limiting/
+      loud_track.wav
+    logs/
+      processing.log
+      normalization_report.csv
+      needs_limiting_report.csv
+```
 
-3. Run the GUI:
-   ```bash
-   python normalize_gui_modern.py
-   ```
+With `--no-batch-folders` (flat mode):
 
-4. Or use the CLI:
-   ```bash
-   python normalize_lufs_core.py /path/to/input /path/to/output -t -24 -p -2
-   ```
+```
+output/
+  audio_-23LUFS.wav
+  speech_-23LUFS.wav
+  needs_limiting/
+    loud_track.wav
+  processing.log
+  normalization_report.csv
+```
+
+Output filenames replace any existing `_-XXLUFS` or `_normalized` suffix with the new target. For example, `audio_-18LUFS.wav` normalized to -23 LUFS becomes `audio_-23LUFS.wav`.
+
+---
+
+## CSV Report Schema
+
+### normalization_report.csv
+
+| Column | Description |
+|---|---|
+| `filename` | Input filename |
+| `status` | `OK` or `OK_UNDERSHOOT` |
+| `reason` | `ok` or `peak_limited` |
+| `sample_rate` | Output sample rate in Hz |
+| `bit_depth` | Output bit depth (16, 24, or 32) |
+| `original_lufs` | Measured input loudness |
+| `target_lufs` | Requested target |
+| `final_lufs` | Measured output loudness |
+| `gain_applied_db` | Gain applied in dB |
+| `true_peak_dBTP` | Output True Peak in dBTP |
+| `lra_lu` | Loudness Range in LU (empty if file shorter than 3 seconds) |
+
+### needs_limiting_report.csv
+
+Generated in Strict mode when files are skipped.
+
+| Column | Description |
+|---|---|
+| `filename` | Input filename |
+| `original_lufs` | Measured input loudness |
+| `predicted_peak_dBTP` | Peak that would result from normalization |
+| `gain_needed_db` | Gain that would be required |
+| `lra_lu` | Loudness Range in LU (empty if file shorter than 3 seconds) |
+| `reason` | `would_exceed_peak_ceiling` |
+
+---
+
+## BWF / iXML Metadata
+
+When enabled (`--bwf` on CLI, or the "Embed BWF metadata" checkbox in the GUI), WAV output files receive two additional RIFF chunks. AIFF files are unaffected.
+
+### BEXT chunk (EBU Tech 3285 v2)
+
+| Field | Value |
+|---|---|
+| Description | `Normalized to -23.0 LUFS by LUFS Normalizer v3.0.1` |
+| Originator | `LUFS Normalizer` |
+| OriginatorReference | `LN301` |
+| OriginationDate | Processing date (yyyy-mm-dd) |
+| OriginationTime | Processing time (hh:mm:ss) |
+| LoudnessValue | Final LUFS (int16, value x 100) |
+| LoudnessRange | LRA in LU (int16, value x 100) |
+| MaxTruePeakLevel | dBTP (int16, value x 100) |
+
+### iXML chunk
+
+```xml
+<BWFXML>
+  <IXML_VERSION>1.52</IXML_VERSION>
+  <PROJECT>LUFS Normalizer</PROJECT>
+  <NOTE>Normalized to -23.0 LUFS by LUFS Normalizer v3.0.1</NOTE>
+  <USER>
+    <TARGET_LUFS>-23.0</TARGET_LUFS>
+    <FINAL_LUFS>-23.01</FINAL_LUFS>
+    <LRA_LU>8.2</LRA_LU>
+    <TRUE_PEAK_DBTP>-1.82</TRUE_PEAK_DBTP>
+  </USER>
+</BWFXML>
+```
+
+Compatible with Wwise, FMOD, and broadcast QC tools.
 
 ---
 
 ## CLI Usage
 
+```
+python -m lufs_normalizer input_dir output_dir [options]
+```
+
+### Options
+
+| Flag | Description | Default |
+|---|---|---|
+| `-t`, `--target` | Target LUFS | -23.0 |
+| `-p`, `--peak` | Peak ceiling in dBTP | -1.0 |
+| `-b`, `--bits` | Output bit depth (`preserve`, `16`, `24`, `32`) | `preserve` |
+| `-r`, `--rate` | Output sample rate (`preserve`, `44100`, `48000`) | `preserve` |
+| `--no-batch-folders` | Flat output (no timestamped subdirectory) | off |
+| `--no-log` | Skip log file generation | off |
+| `--no-csv` | Skip CSV report generation | off |
+| `--drift` | Drift mode (reduce gain to protect peak) | off (strict) |
+| `--bwf` | Embed BWF BEXT + iXML in output WAV files | off |
+| `--parallel` | Enable parallel processing | off |
+| `--workers N` | Number of parallel workers | CPU count |
+| `--watch` | Watch folder mode (monitor for new files) | off |
+
+### Examples
+
 ```bash
-python normalize_lufs_core.py INPUT_DIR OUTPUT_DIR [OPTIONS]
+# EBU R128 broadcast normalization
+python -m lufs_normalizer input/ output/ -t -23 -p -1
 
-Options:
-  -t, --target FLOAT    Target LUFS (default: -23.0)
-  -p, --peak FLOAT      Peak ceiling dBTP (default: -1.0)
-  -b, --bits            Bit depth: preserve, 16, 24, 32 (default: preserve)
-  -r, --rate            Sample rate: preserve, 44100, 48000 (default: preserve)
+# Parallel processing with 8 workers and BWF metadata
+python -m lufs_normalizer input/ output/ -t -24 -p -2 --parallel --workers 8 --bwf
+
+# Drift mode (never skip files)
+python -m lufs_normalizer input/ output/ -t -14 --drift
+
+# Watch folder mode
+python -m lufs_normalizer --watch input/ output/ -t -24 --bwf
+
+# Convert to 48 kHz / 24-bit, flat output
+python -m lufs_normalizer input/ output/ -t -16 -b 24 -r 48000 --no-batch-folders
 ```
 
-**Example:**
+---
+
+## GUI Usage
+
+Launch with no arguments:
+
 ```bash
-python normalize_lufs_core.py ./raw_audio ./normalized -t -16 -p -1 -b 24
+python -m lufs_normalizer
+```
+
+Or via the shim script:
+
+```bash
+python normalize_gui_modern.py
+```
+
+### Batch Processing tab
+
+1. Select input and output folders
+2. Choose a preset or set LUFS / peak values manually
+3. Configure bit depth, sample rate, and options (BWF, parallel, strict/drift)
+4. Click **Start Processing**
+
+The LUFS spinner supports Up/Down arrow keys (1.0 step) and Shift+Up/Down (0.1 step).
+
+Settings are saved to `config.json` next to the application and restored on launch.
+
+### Watch Folder tab
+
+1. Set a watch folder and output folder
+2. Select a processing profile (any of the 10 presets)
+3. Click **Start Watch**
+
+New `.wav` and `.aiff` files dropped into the watch folder are automatically detected, waited on until the write completes, then processed. The panel shows a real-time activity log. Requires the `watchdog` package.
+
+---
+
+## Building the Exe
+
+### Using the build script
+
+```
+build.bat
+```
+
+This installs build dependencies, generates the application icon via `create_icon.py`, and runs PyInstaller to produce a single-file exe. The distribution is written to `dist/LUFSNormalizer_v3.0.0/` with the exe, `config.json`, and icon files.
+
+### Manual build
+
+```bash
+pip install pyinstaller
+pyinstaller LUFSNormalizer_v3.0.0.spec
+```
+
+The spec file bundles `config.json`, the `lufs_normalizer` package, and hidden imports for PySide6, soundfile, pyloudnorm, soxr, numpy, and watchdog.
+
+Place `config.json` next to the exe for default settings. The exe creates and updates this file to persist user preferences.
+
+---
+
+## Running from Source
+
+### Requirements
+
+- Python 3.9+
+- Windows (primary target), macOS and Linux supported
+
+### Install
+
+```bash
+pip install -r requirements.txt
+```
+
+### Dependencies
+
+| Package | Purpose | Required |
+|---|---|---|
+| `soundfile` | Audio file I/O (WAV, AIFF via libsndfile) | Yes |
+| `pyloudnorm` | LUFS measurement (BS.1770-4) | Yes |
+| `numpy` | Array processing | Yes |
+| `PySide6` | GUI framework | Yes (GUI mode) |
+| `soxr` | Resampling and True Peak oversampling | Recommended |
+| `watchdog` | Watch folder file monitoring | Optional |
+| `scipy` | Fallback True Peak oversampling if soxr absent | Optional |
+| `Pillow` | Icon generation at build time | Build only |
+
+### Run
+
+```bash
+# GUI
+python -m lufs_normalizer
+
+# CLI
+python -m lufs_normalizer input/ output/ -t -23
+
+# Direct script
+python normalize_gui_modern.py
 ```
 
 ---
 
-## Output Structure
-
-When "Organize output in timestamped batch folders" is enabled:
-
-```
-output_folder/
-└── batch_20240115_143022_-24LUFS/
-    ├── normalized/
-    │   ├── audio1_-24LUFS.wav
-    │   └── audio2_-24LUFS.wav
-    ├── needs_limiting/
-    │   └── hot_audio_-24LUFS.wav
-    └── logs/
-        ├── processing.log
-        └── normalization_report.csv
-```
-
----
-
-## CSV Report Columns
-
-| Column | Description |
-|--------|-------------|
-| filename | Original filename |
-| status | OK, OK_UNDERSHOOT, SKIPPED, BLOCKED, FAILED |
-| reason | ok, peak_limited, would_exceed_peak_ceiling, too_quiet, upsample_blocked |
-| sample_rate | Output sample rate |
-| bit_depth | Output bit depth |
-| original_lufs | Measured input loudness |
-| target_lufs | Requested target |
-| final_lufs | Actual output loudness |
-| gain_applied_db | Gain adjustment made |
-| true_peak_dBTP | Final True Peak measurement |
-
----
-
-## Keyboard Shortcuts
+## Keyboard Shortcuts (GUI)
 
 | Key | Action |
-|-----|--------|
-| Up Arrow | Increase LUFS by 1.0 |
-| Down Arrow | Decrease LUFS by 1.0 |
-| Shift + Up | Increase LUFS by 0.1 |
-| Shift + Down | Decrease LUFS by 0.1 |
-
----
-
-## Building a Standalone Executable
-
-See the PyInstaller command below to create a single-file Windows executable.
+|---|---|
+| Up / Down | Adjust LUFS target by 1.0 |
+| Shift + Up / Down | Adjust LUFS target by 0.1 |
 
 ---
 
@@ -194,13 +322,7 @@ See the PyInstaller command below to create a single-file Windows executable.
 
 Developed by Mario Vitale
 
-**Libraries:**
-- [pyloudnorm](https://github.com/csteinmetz1/pyloudnorm) - ITU-R BS.1770-4 loudness measurement
-- [soundfile](https://github.com/bastibe/python-soundfile) - Audio file I/O
-- [soxr](https://github.com/dofuuz/python-soxr) - High-quality resampling
-- [customtkinter](https://github.com/TomSchimansky/CustomTkinter) - Modern dark-themed GUI
-
----
+**Libraries:** [pyloudnorm](https://github.com/csteinmetz1/pyloudnorm), [soundfile](https://github.com/bastibe/python-soundfile), [soxr](https://github.com/dofuuz/python-soxr), [PySide6](https://doc.qt.io/qtforpython-6/)
 
 ## License
 
