@@ -1,0 +1,225 @@
+================================================================================
+LUFS NORMALIZER — SESSION HANDOFF SUMMARY
+Date: 2026-02-17
+Author: Mario Vitale (Lead Audio Architect)
+AI Assistant: Claude Opus 4.6
+================================================================================
+
+PROJECT STATE AT SESSION START
+------------------------------
+- Version: v2.5.0 (released)
+- Core engine: normalize_lufs_core.py (667 lines)
+- GUI: normalize_gui_modern.py (812 lines, CustomTkinter)
+- Build: PyInstaller single-exe on Windows 11
+- Key v2.5.0 features already in place:
+  - 10 industry presets (ATSC A/85, EBU R128, ASWG, etc.)
+  - Favorites system (1-5 pinned presets with drag-drop reorder)
+  - Strict vs Drift mode for peak handling
+  - CSV/log reporting with reason column
+  - True Peak via SOXR 4x oversampling
+  - TPDF dithering for bit depth reduction
+
+================================================================================
+
+WHAT WE DID IN THIS SESSION
+============================
+
+1. v3.0 STRATEGY REVIEW
+------------------------
+Performed a full audit of the v2.5.0 codebase covering safety logic,
+architecture, UI framework options, and feature roadmap. The review
+identified two bugs and several optimization opportunities.
+
+2. BUGS FOUND AND FIXED (v2.5.1)
+----------------------------------
+
+BUG #1 — LUFS Meter Sample Rate Mismatch After Resampling (P0)
+  Location: normalize_lufs_core.py, line 522-525
+  Problem:  The pyloudnorm Meter was created at the original file's sample
+            rate (e.g., 96kHz) but used to measure the final LUFS of
+            resampled data (e.g., 48kHz). pyloudnorm bakes filter
+            coefficients into the Meter at construction time, so measuring
+            48kHz audio with a 96kHz meter produces incorrect LUFS values.
+  Fix:      Added conditional meter creation after resampling:
+            final_meter = pyln.Meter(output_rate) if output_rate != rate else meter
+  Impact:   Any file that was resampled to a different rate had an incorrect
+            final_lufs value in the CSV report and log.
+
+BUG #2 — Missing 'reason' Field in FAILED Error Dicts (P0)
+  Location: normalize_lufs_core.py, line 575-579
+  Problem:  When a file threw an exception during processing, the error dict
+            appended to self.errors was missing the 'reason' key that all
+            other result dicts (OK, OK_UNDERSHOOT, SKIPPED, BLOCKED,
+            NEEDS_LIMITING) include. This breaks any downstream code that
+            expects a uniform schema across all result entries.
+  Fix:      Added 'reason': 'exception' to the FAILED error dict.
+  Impact:   CSV reports and any automation consuming results could crash or
+            produce incomplete rows for failed files.
+
+Both fixes were applied, version bumped to v2.5.1 (core) and v2.9.1 (GUI),
+committed, and tagged as v2.5.1 in git.
+
+3. GIT REPOSITORY INITIALIZED
+-------------------------------
+- Initialized git repo in project root
+- Configured identity: Mario Vitale <mariovitalesound@gmail.com>
+- Created .gitignore (excludes __pycache__, build/, dist/, *.pyc)
+- Committed all project files as v2.5.1
+- Tagged: v2.5.1 (commit 8779acf)
+- This serves as the clean archive point before v3.0 work begins
+
+================================================================================
+
+STRICT vs DRIFT LOGIC — DETAILED EXPLANATION
+=============================================
+
+The core engine supports two peak-handling modes, controlled by the
+strict_lufs_matching parameter (boolean, default True).
+
+STRICT MODE (Default):
+  When: predicted_peak > peak_ceiling AND strict_lufs_matching = True
+  Behavior:
+    1. The file is NOT processed (no gain applied)
+    2. The original file is COPIED to a 'needs_limiting' subfolder
+    3. Status logged as NEEDS_LIMITING with reason 'peak_exceeded'
+    4. The file appears in the skipped_files list and CSV report
+  Use case: Broadcast delivery where exact LUFS target is mandatory.
+            Files that can't meet both LUFS and peak are flagged for
+            manual limiting in a DAW.
+
+DRIFT MODE:
+  When: predicted_peak > peak_ceiling AND strict_lufs_matching = False
+  Behavior:
+    1. Measures the original file's True Peak
+    2. Calculates headroom = peak_ceiling - original_peak
+    3. Sets max_safe_gain = headroom (may be negative if source is already hot)
+    4. Applies actual_gain = min(requested_gain, max_safe_gain)
+    5. The file IS processed, but LUFS may undershoot the target
+    6. Status logged as OK_UNDERSHOOT with reason 'peak_limited'
+  Use case: Game audio / music where approximate LUFS is acceptable
+            as long as True Peak is never exceeded.
+
+EDGE CASES IDENTIFIED IN REVIEW:
+  - If original file already exceeds peak ceiling, drift mode applies
+    NEGATIVE gain (attenuates). Correct behavior but no distinct warning
+    is logged — recommend adding an ATTENUATED status in v3.0.
+  - No files can "fall through" — every code path either processes the
+    file or skips it with a logged status. All paths verified:
+    Silent → SKIPPED | Peak exceeded + Strict → NEEDS_LIMITING |
+    Peak exceeded + Drift → OK_UNDERSHOOT | Peak OK → OK |
+    Upsample blocked → BLOCKED | Exception → FAILED
+
+================================================================================
+
+UI FRAMEWORK DEBATE — CUSTOMTKINTER vs ALTERNATIVES
+====================================================
+
+The v2.x GUI uses CustomTkinter (ctk), which works but has limitations
+for a professional audio tool. We evaluated five frameworks:
+
+CUSTOMTKINTER (Current)
+  Pros: Native feel, lightweight (~30MB exe), simple API, excellent
+        PyInstaller support, dark theme built-in
+  Cons: No real-time visualization (waveforms, VU meters), limited
+        layout system (pack/grid only), no native drag-and-drop (requires
+        tkdnd extension), callback-based threading (root.after pattern)
+  Verdict: Adequate for v2.x but ceiling reached
+
+PYSIDE6 / QT (Recommended for v3.0)
+  Pros:
+    - QGraphicsView / QPainter for real-time loudness meters and waveforms
+    - Native drag-and-drop (QDragEnterEvent)
+    - QTableView for sortable batch result tables
+    - Thread-safe signal/slot system (no root.after() needed)
+    - QThread with custom signals is cleaner than threading.Thread
+    - Professional-grade layout system (QVBoxLayout, QGridLayout, QFormLayout)
+    - Massive ecosystem and documentation
+  Cons: Larger exe (~45-80MB after trimming unused Qt modules), steeper
+        learning curve
+  Verdict: CHOSEN for v3.0. Best fit for audio utility apps.
+
+FLET (Flutter-based)
+  Pros: Modern Material Design look, cross-platform web/desktop/mobile
+  Cons: Adds Flutter runtime dependency, limited real-time visualization,
+        complex PyInstaller packaging, immature ecosystem
+  Verdict: Not suitable for audio utility
+
+DEARPYGUI (GPU-accelerated)
+  Pros: Excellent real-time data visualization, GPU-rendered, fast
+  Cons: Less polished for forms/dialogs/standard UI, smaller community
+  Verdict: Good for visualization-heavy apps, overkill for our forms-based UI
+
+NICEGUI (Web-based)
+  Pros: Modern web UI, good charting, easy to prototype
+  Cons: Runs as local web server, not a desktop app, no PyInstaller
+  Verdict: Wrong paradigm for desktop audio tool
+
+MIGRATION COST ESTIMATE:
+  The current GUI is ~812 lines of CustomTkinter. A PySide6 rewrite
+  would be ~600-700 lines (Qt's layout system is more concise). The core
+  engine requires ZERO changes — only the GUI layer is replaced.
+
+================================================================================
+
+v3.0 IMPLEMENTATION PLAN (APPROVED)
+=====================================
+
+Phase 0: Package Restructure
+  - Split 2 flat files into lufs_normalizer/ package (21 new files)
+  - No behavior changes, backward-compat shims maintained
+
+Phase 1: PySide6 GUI Migration (highest risk, largest effort)
+  - Full GUI rewrite with QMainWindow, QThread workers, signal/slot
+  - Feature parity with v2.5.1 before adding anything new
+
+Phase 2: Parallel Processing
+  - ProcessPoolExecutor for 3-6x speedup on 1000+ file batches
+  - Standalone process_single_file() function (serializable, no self)
+
+Phase 3: LRA (Loudness Range) Measurement
+  - EBU R128 LRA from short-term loudness distribution
+  - New CSV column: lra_lu
+
+Phase 4: BWF/iXML Metadata Injection
+  - BEXT chunks: LoudnessValue, LoudnessRange, MaxTruePeakLevel
+  - Optional iXML for Wwise/FMOD pipelines
+
+Phase 5: Watch Folder Mode
+  - watchdog-based directory monitoring
+  - Integrated as a tab in the main window (QTabWidget)
+
+Phase 6: Build & Polish
+  - PyInstaller spec updates for PySide6
+  - Config migration (v2 → v3)
+  - Release notes and documentation
+
+Approach: Phase by phase with working git commits between each milestone.
+
+================================================================================
+
+FILES MODIFIED IN THIS SESSION
+===============================
+
+normalize_lufs_core.py:
+  - Version: 2.5.0 → 2.5.1
+  - Docstring: Added v2.5.1 changelog
+  - Line ~527: Added final_meter with correct output_rate for LUFS measurement
+  - Line ~586: Added 'reason': 'exception' to FAILED error dict
+
+normalize_gui_modern.py:
+  - Version: 2.9.0 → 2.9.1
+  - Docstring: Added v2.9.1 changelog noting core engine fix
+
+New files created:
+  - .gitignore (excludes __pycache__, build/, dist/, *.pyc)
+  - handoff_summary.txt (this file)
+
+Git state:
+  - Branch: master
+  - Tag: v2.5.1
+  - Commit: 8779acf
+
+================================================================================
+
+NEXT SESSION: Begin Phase 0 (package restructure)
+================================================================================

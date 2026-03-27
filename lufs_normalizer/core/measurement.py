@@ -51,11 +51,8 @@ def measure_lra(audio_data, sample_rate):
     """
     Measure EBU R128 Loudness Range (LRA) in LU.
 
-    Implements EBU R128 s1:
-    1. Compute short-term loudness (3s window, 200ms hop)
-    2. Apply absolute gate at -70 LUFS
-    3. Apply relative gate at -20 LU below ungated mean
-    4. LRA = difference between 95th and 10th percentile of gated distribution
+    Uses pyloudnorm's built-in loudness_range() which computes proper
+    ungated short-term loudness with K-weighting per EBU R128 s1.
 
     Args:
         audio_data: numpy array of audio samples (mono or multi-channel)
@@ -73,49 +70,16 @@ def measure_lra(audio_data, sample_rate):
         else:
             data_2d = audio_data
 
-        # Short-term loudness: 3 second window, 200ms hop
-        window_samples = int(3.0 * sample_rate)
-        hop_samples = int(0.2 * sample_rate)
-
-        if len(data_2d) < window_samples:
+        # Need at least 3 seconds for short-term loudness window
+        min_samples = int(3.0 * sample_rate)
+        if len(data_2d) < min_samples:
             return None
 
         meter = pyln.Meter(sample_rate)
+        lra = meter.loudness_range(data_2d)
 
-        short_term_loudness = []
-        pos = 0
-        while pos + window_samples <= len(data_2d):
-            block = data_2d[pos:pos + window_samples]
-            loudness = meter.integrated_loudness(block)
-            if loudness != float('-inf'):
-                short_term_loudness.append(loudness)
-            pos += hop_samples
-
-        if len(short_term_loudness) < 2:
+        if lra == float('-inf') or lra == float('inf') or np.isnan(lra):
             return None
-
-        st_array = np.array(short_term_loudness)
-
-        # Absolute gate: -70 LUFS
-        abs_gated = st_array[st_array > -70.0]
-        if len(abs_gated) < 2:
-            return None
-
-        # Relative gate: -20 LU below mean of absolute-gated values
-        # Convert LUFS to linear, compute mean, convert back
-        abs_gated_linear = 10 ** (abs_gated / 10.0)
-        mean_linear = np.mean(abs_gated_linear)
-        mean_lufs = 10 * np.log10(mean_linear)
-        relative_threshold = mean_lufs - 20.0
-
-        rel_gated = abs_gated[abs_gated > relative_threshold]
-        if len(rel_gated) < 2:
-            return None
-
-        # LRA = 95th percentile - 10th percentile
-        p95 = np.percentile(rel_gated, 95)
-        p10 = np.percentile(rel_gated, 10)
-        lra = p95 - p10
 
         return round(lra, 1)
 

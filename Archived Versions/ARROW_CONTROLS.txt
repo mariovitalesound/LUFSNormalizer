@@ -1,0 +1,151 @@
+ARROW BUTTON BEHAVIOR - CORRECTED
+==================================
+
+LUFS ADJUSTMENT CONTROLS
+-------------------------
+
+**COARSE ADJUSTMENT (±1.0 LUFS):**
+- Click ▲ button
+- Click ▼ button
+- Press Up Arrow key
+- Press Down Arrow key
+
+Example:
+-23.0 → (Up) → -22.0 → (Up) → -21.0
+-23.0 → (Down) → -24.0 → (Down) → -25.0
+
+
+**FINE ADJUSTMENT (±0.1 LUFS):**
+- Hold Shift + Click ▲ button
+- Hold Shift + Click ▼ button
+- Hold Shift + Press Up Arrow key
+- Hold Shift + Press Down Arrow key
+
+Example:
+-22.0 → (Shift+Up) → -21.9 → (Shift+Up) → -21.8
+-22.0 → (Shift+Down) → -22.1 → (Shift+Down) → -22.2
+
+
+PRACTICAL USAGE
+---------------
+
+**Scenario 1: Quick preset adjustment**
+1. Click "Game Audio" (-18.0 LUFS)
+2. Want -17.0 instead
+3. Click ▲ once
+4. Now at -17.0 LUFS ✓
+
+**Scenario 2: Precise fine-tuning**
+1. Current: -18.0 LUFS
+2. Want -17.8 LUFS exactly
+3. Click ▲ twice → -16.0 LUFS
+4. Hold Shift, click ▼ twice → -16.2 LUFS
+5. Keep adjusting with Shift+▼ until -17.8 ✓
+
+**Scenario 3: Keyboard workflow**
+1. Click in Target LUFS field
+2. Press Up Arrow 5 times → +5.0 LUFS
+3. Hold Shift, press Down 3 times → -0.3 LUFS
+4. Result: Net +4.7 LUFS change ✓
+
+
+RANGE LIMITS
+------------
+
+**Minimum:** -60.0 LUFS
+**Maximum:** 0.0 LUFS
+
+Values are clamped to this range automatically.
+
+
+COMPARISON TO WRONG IMPLEMENTATION
+-----------------------------------
+
+**WRONG (what I had initially):**
+- No Shift: ±1 LUFS
+- Shift: ±10 LUFS
+- Problem: No way to do fine 0.1 adjustments!
+
+**CORRECT (what it is now):**
+- No Shift: ±1.0 LUFS (coarse)
+- Shift: ±0.1 LUFS (fine)
+- Perfect: Both coarse and fine control!
+
+
+WHY THIS MAKES SENSE
+--------------------
+
+**Professional workflow needs both:**
+
+**Coarse (±1.0):**
+- Quick adjustments between standards
+- -23 (broadcast) → -18 (game) → -14 (streaming)
+- Fast iteration
+
+**Fine (±0.1):**
+- Precise matching to specific targets
+- "I need exactly -17.8 LUFS"
+- Professional fine-tuning
+- Matching reference tracks
+
+
+KEYBOARD SHORTCUTS SUMMARY
+---------------------------
+
+**Focus Target LUFS field, then:**
+
+Up Arrow          → +1.0 LUFS
+Down Arrow        → -1.0 LUFS
+Shift + Up        → +0.1 LUFS
+Shift + Down      → -0.1 LUFS
+
+
+MOUSE CONTROLS SUMMARY
+----------------------
+
+Click ▲           → +1.0 LUFS
+Click ▼           → -1.0 LUFS
+Shift + Click ▲   → +0.1 LUFS
+Shift + Click ▼   → -0.1 LUFS
+
+
+TESTING THE BEHAVIOR
+--------------------
+
+**Test 1: Coarse adjustment**
+1. Set to -23.0
+2. Click ▲ 5 times
+3. Should show: -18.0 ✓
+
+**Test 2: Fine adjustment**
+1. Set to -18.0
+2. Hold Shift, click ▼ 3 times
+3. Should show: -18.3 ✓
+
+**Test 3: Mixed adjustment**
+1. Set to -20.0
+2. Click ▲ twice → -18.0
+3. Shift+▼ five times → -18.5
+4. Final: -18.5 ✓
+
+**Test 4: Keyboard fine control**
+1. Set to -15.0
+2. Focus field (click in it)
+3. Hold Shift, press Down 7 times
+4. Should show: -15.7 ✓
+
+
+THIS IS HOW PRO TOOLS DOES IT
+------------------------------
+
+Pro Tools and other DAWs use this exact pattern:
+- Regular click/arrow = whole units
+- Shift + click/arrow = tenths
+
+Industry standard UX pattern for professional audio software.
+
+
+=======================================
+v2.3.0 FINAL - CORRECT ARROW BEHAVIOR
+Coarse: ±1.0 | Fine: ±0.1
+=======================================

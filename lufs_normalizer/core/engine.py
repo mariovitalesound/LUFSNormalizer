@@ -34,6 +34,7 @@ class LUFSNormalizer:
         self.results = []
         self.errors = []
         self.skipped_files = []
+        self.skipped_silent = []
 
     def set_progress_callback(self, callback):
         """Set callback for progress updates: callback(current, total, filename)"""
@@ -50,12 +51,17 @@ class LUFSNormalizer:
             self._stop_event.set()
 
     def _find_audio_files(self, input_dir):
-        """Find all WAV and AIFF files in input directory."""
+        """Find all WAV and AIFF files in input directory, deduplicated."""
         input_path = Path(input_dir)
-        wav_files = list(input_path.glob('*.wav')) + list(input_path.glob('*.WAV'))
-        aiff_files = (list(input_path.glob('*.aiff')) + list(input_path.glob('*.AIFF')) +
-                      list(input_path.glob('*.aif')) + list(input_path.glob('*.AIF')))
-        return sorted(wav_files + aiff_files)
+        seen = set()
+        files = []
+        for pattern in ('*.wav', '*.WAV', '*.aiff', '*.AIFF', '*.aif', '*.AIF'):
+            for f in input_path.glob(pattern):
+                resolved = f.resolve()
+                if resolved not in seen:
+                    seen.add(resolved)
+                    files.append(f)
+        return sorted(files)
 
     def _setup_output_dirs(self, output_dir, target_lufs, use_batch_folders):
         """Create output directory structure. Returns (batch_path, normalized_path, needs_limiting_path, logs_path)."""
@@ -137,7 +143,7 @@ class LUFSNormalizer:
                                      f'Would peak at {peak:.1f}dBTP')
 
         elif rtype == 'skipped':
-            self.errors.append(result['error'])
+            self.skipped_silent.append(result['error'])
             if self.result_callback:
                 self.result_callback(filename, 'SKIPPED', 'Too quiet/silent')
 
@@ -183,6 +189,7 @@ class LUFSNormalizer:
         """Log the final batch summary."""
         success_count = len(self.results)
         skipped_count = len(self.skipped_files)
+        silent_count = len(self.skipped_silent)
         error_count = len(self.errors)
 
         logger.info("=" * 70)
@@ -193,6 +200,9 @@ class LUFSNormalizer:
             logger.warning(f"NEEDS LIMITING: {skipped_count} files exceeded peak ceiling")
             logger.warning(f"  -> Copied to: {needs_limiting_path}")
             logger.warning(f"  -> Apply a limiter in your DAW, then re-process")
+
+        if silent_count > 0:
+            logger.info(f"Skipped: {silent_count} silent/too-quiet files")
 
         if error_count > 0:
             logger.error(f"Errors: {error_count} files failed")
@@ -214,6 +224,7 @@ class LUFSNormalizer:
         self.results = []
         self.errors = []
         self.skipped_files = []
+        self.skipped_silent = []
 
         audio_files = self._find_audio_files(input_dir)
         if not audio_files:
@@ -290,6 +301,7 @@ class LUFSNormalizer:
         self.results = []
         self.errors = []
         self.skipped_files = []
+        self.skipped_silent = []
 
         audio_files = self._find_audio_files(input_dir)
         if not audio_files:

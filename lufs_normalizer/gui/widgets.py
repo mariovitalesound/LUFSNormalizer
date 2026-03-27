@@ -74,8 +74,14 @@ class SpinnerEntry(QWidget):
 
     def _adjust(self, delta):
         try:
+            import math
             current = float(self.entry.text())
-            new_value = round(current + delta, 1)
+            is_fractional = abs(current - round(current)) > 0.01
+            if abs(delta) >= 1.0 and is_fractional:
+                # Snap to nearest integer in the direction of adjustment
+                new_value = float(math.ceil(current) if delta > 0 else math.floor(current))
+            else:
+                new_value = round(current + delta, 1)
             self.entry.setText(str(new_value))
         except ValueError:
             pass

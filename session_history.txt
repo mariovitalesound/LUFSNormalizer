@@ -1,0 +1,1047 @@
+
+╭─── Claude Code v2.1.39 ──────────────────────────────────────────────────────╮
+│                                                │ Tips for getting started    │
+│               Welcome back Mario!              │ Run /init to create a CLAU… │
+│                                                │ ─────────────────────────── │
+│                     ▐▛███▜▌                    │ Recent activity             │
+│                    ▝▜█████▛▘                   │ No recent activity          │
+│                      ▘▘ ▝▝                     │                             │
+│                                                │                             │
+│             Opus 4.6 · Claude Pro              │                             │
+│   ~\Documents\claude-projects\LUFSNormalizer   │                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+❯ @normalize_lufs_core.py @normalize_gui_modern.py @verify_audio.py         
+  @RELEASE_NOTES_v2.4.1.txt                                                 
+                                                                            
+  I am the Lead Audio Architect for this LUFS Normalizer tool (v2.4.1). We  
+  just completed a major refactor to ensure Broadcast Compliance (EBU       
+  R128).                                                                    
+                                                                            
+  CONTEXT:                                                                  
+  - We recently fixed critical DSP issues: we now use SOXR for 4x           
+  oversampling (True Peak), we implemented TPDF dithering, and we fixed a   
+  "fake limiter" logic to be a proper global gain reduction for peak        
+  compliance.                                                               
+  - The GUI is built with CustomTkinter.                                    
+  - We use PyInstaller for distribution.                                    
+                                                                            
+  YOUR TASK:                                                                
+  Please perform a "v3.0 Strategy Review" on these files. I am looking for: 
+  1. CODE QUALITY: Analyze `normalize_lufs_core.py` for any remaining       
+  threading bottlenecks or unpythonic patterns that could slow down large   
+  batch processing (1000+ files).                                           
+  2. UI UX: `normalize_gui_modern.py` works, but feels rigid. If you were   
+  rebuilding this for v3.0 in 2026, would you stick with CustomTkinter, or  
+  is there a better Python UI framework for modern audio apps (e.g., Flet,  
+  NiceGUI)?                                                                 
+  3. FEATURES: Suggest 3 "Killer Features" for the next major version that  
+  would appeal to Game Audio professionals (e.g., metadata injection,       
+  loudness range/LRA analysis, or multi-format export).                     
+  4. SAFETY: Double-check my `enforce_peak_ceiling` logic in the core file. 
+   Did I miss any edge cases where a file could still clip?                 
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ @normalize_lufs_core.py @normalize_gui_modern.py                          
+  @RELEASE_NOTES_v2.5.0.txt @config.json                                    
+                                                                            
+  I am the Lead Audio Architect for this LUFS Normalizer tool. We have just 
+   released v2.5.0.                                                         
+                                                                            
+  CURRENT STATE (v2.5.0):                                                   
+  - We now support 10 industry presets (ATSC A/85, EBU R128, ASWG, etc.).   
+  - We implemented a "Favorites" system to pin presets in the UI.           
+  - CRITICAL LOGIC: We added "Strict" vs "Drift" modes.                     
+    - "Strict" (Default): Skips files that would clip or exceed True Peak   
+  if normalized to target LUFS (moves them to a 'needs_limiting' folder).   
+    - "Drift": Reduces gain to respect the True Peak ceiling, sacrificing   
+  the LUFS target.                                                          
+                                                                            
+  YOUR TASK:                                                                
+  Please perform a "v3.0 Strategy Review" based on this v2.5.0 codebase. I  
+  need you to look for the following:                                       
+                                                                            
+  1. SAFETY LOGIC AUDIT (High Priority):                                    
+     Review the `Strict` vs `Drift` implementation in                       
+  `normalize_lufs_core.py`.                                                 
+     - Are there edge cases where a file could fall through the cracks      
+  (neither processed nor skipped)?                                          
+     - Is the `needs_limiting` folder creation robust across different OS   
+  paths?                                                                    
+                                                                            
+  2. ARCHITECTURE & PERFORMANCE:                                            
+     We are processing batches of 1000+ wav files.                          
+     - Analyze the main loop. Is `scipy` or `soxr` being re-initialized     
+  unnecessarily?                                                            
+     - Would implementing `multiprocessing` (ProcessPoolExecutor) be safe   
+  given our logging/CSV writing requirements?                               
+                                                                            
+  3. UI FRAMEWORK DECISION:                                                 
+     The `normalize_gui_modern.py` is getting large (Favorites management + 
+   10 presets).                                                             
+     - For v3.0, should we stick with CustomTkinter, or move to a framework 
+   like Flet or PySide6?                                                    
+     - Compare them specifically for an "Audio Utility" use case            
+  (drag-and-drop, real-time metering visuals).                              
+                                                                            
+  4. v3.0 "KILLER FEATURES" (Game Audio Focus):                             
+     Suggest 3 advanced features for the next version.                      
+     - Example ideas: LRA (Loudness Range) filtering, embedded iXML         
+  metadata support, or "Watch Folder" automation.                           
+
+● LUFS Normalizer v3.0 Strategy Review
+
+  1. SAFETY LOGIC AUDIT — Strict vs Drift
+
+  I traced every code path through normalize_batch. Here's what I found:
+
+  All paths accounted for (no files fall through):
+  ┌──────────────────────┬─────────────────────────┬─────────────────────────┐
+  │      Condition       │       Strict Mode       │       Drift Mode        │
+  ├──────────────────────┼─────────────────────────┼─────────────────────────┤
+  │ Silent/too quiet     │ SKIPPED                 │ SKIPPED                 │
+  ├──────────────────────┼─────────────────────────┼─────────────────────────┤
+  │ Peak exceeds ceiling │ NEEDS_LIMITING (copied) │ Gain reduced, processed │
+  ├──────────────────────┼─────────────────────────┼─────────────────────────┤
+  │ Peak OK              │ Processed normally      │ Processed normally      │
+  ├──────────────────────┼─────────────────────────┼─────────────────────────┤
+  │ Upsample blocked     │ BLOCKED                 │ BLOCKED                 │
+  ├──────────────────────┼─────────────────────────┼─────────────────────────┤
+  │ Exception            │ FAILED                  │ FAILED                  │
+  └──────────────────────┴─────────────────────────┴─────────────────────────┘
+  BUG FOUND — LUFS meter uses wrong sample rate after resampling
+
+  normalize_lufs_core.py:381 creates the meter at the original rate:
+  meter = pyln.Meter(rate)
+
+  But after resampling at line 480-483, the data is at output_rate. Then at
+  lines 522-525, final_lufs is measured with the original-rate meter against
+  resampled data:
+  final_lufs = meter.integrated_loudness(normalized_data)  # data is at 
+  output_rate, meter is at rate
+
+  pyloudnorm.Meter bakes the sample rate into its filter coefficients. If a
+  96kHz file is downsampled to 48kHz, the final LUFS measurement is wrong. Fix: 
+  recreate the meter after resampling or conditionally create a new one:
+  final_meter = pyln.Meter(output_rate) if output_rate != rate else meter
+
+  Edge case in Drift mode — original already exceeds ceiling
+
+  At normalize_lufs_core.py:439-442:
+  original_peak = measure_true_peak(data, rate)
+  headroom = peak_ceiling - original_peak  # NEGATIVE if original already hot
+  max_safe_gain_db = headroom
+  actual_gain_db = min(gain_db, max_safe_gain_db)
+
+  If the source file already exceeds the peak ceiling (e.g., original peak =
+  -0.5 dBTP, ceiling = -1.0 dBTP), then headroom = -0.5 and the file gets
+  attenuated. This is technically correct (it protects the peak), but the user
+  gets no specific warning that the file was made quieter than the original.
+  Consider logging this as a distinct status like ATTENUATED.
+
+  Dither + clip interaction — safe in practice
+
+  Line 514 applies dither, then line 517 clips to [-1.0, 1.0]. TPDF dither at
+  16-bit adds ~±0.00003 (~-90 dB). Since peak ceilings are typically -1.0 dBTP
+  or lower, there's >1 dB of headroom before 0 dBFS. No real risk here.
+
+  needs_limiting path robustness
+
+  Line 414: needs_limiting_path.mkdir(exist_ok=True) — this works because the
+  parent (batch_path) is already created by normalized_path.mkdir(parents=True) 
+  on line 335. Cross-platform safe. No issue.
+
+  Missing reason field in general exceptions
+
+  At line 575-579, the FAILED error dict has no reason key, unlike all other 
+  entries. If downstream code iterates results expecting a uniform schema, this
+  will break. Add 'reason': 'exception'.
+
+  ---
+  2. ARCHITECTURE & PERFORMANCE
+
+  Main loop analysis for 1000+ files
+
+  The bottleneck is measure_true_peak — it 4x oversamples the entire file via
+  SOXR, then scans for max. This is called:
+  - Once per normal file (line 407, on test data)
+  - Twice per drift-mode peak-exceeded file (line 407 on test data + line 439 on
+   original)
+
+  The second call is avoidable. You can derive the original peak mathematically:
+  # Instead of measuring original peak separately:
+  # predicted_peak = original_peak + gain_db (in dB domain)
+  # So: original_peak = predicted_peak - gain_db
+  original_peak_estimated = predicted_peak - gain_db
+
+  This eliminates one full True Peak measurement per drift-mode file. For a
+  batch where 30% of files hit the ceiling, that's a meaningful speedup.
+
+  import soxr inside the loop (lines 214, 479) — Python caches modules after
+  first import, so this is a dictionary lookup, not a re-initialization. No
+  issue.
+
+  Multiprocessing feasibility
+
+  The per-file processing is embarrassingly parallel, but there are
+  complications:
+  Concern: progress_callback
+  Issue: GUI callback, not serializable
+  Solution: Main thread collects futures, updates progress
+  ────────────────────────────────────────
+  Concern: result_callback
+  Issue: Same
+  Solution: Same
+  ────────────────────────────────────────
+  Concern: Logging
+  Issue: File handler shared across processes
+  Solution: Each worker returns results; main thread logs
+  ────────────────────────────────────────
+  Concern: CSV writing
+  Issue: Sequential by nature
+  Solution: Collect all results, write once at end (already the case)
+  ────────────────────────────────────────
+  Concern: stop_requested
+  Issue: Shared state
+  Solution: Use multiprocessing.Event
+  Recommended pattern for v3.0:
+  from concurrent.futures import ProcessPoolExecutor, as_completed
+
+  def process_single_file(audio_path, target_lufs, peak_ceiling, ...):
+      """Standalone function — no self, no callbacks, fully serializable."""
+      # ... all processing logic ...
+      return result_dict
+
+  # In normalize_batch:
+  with ProcessPoolExecutor(max_workers=os.cpu_count()) as pool:
+      futures = {pool.submit(process_single_file, f, ...): f for f in
+  audio_files}
+      for future in as_completed(futures):
+          result = future.result()
+          self.results.append(result)
+          if self.progress_callback:
+              self.progress_callback(...)
+
+  This keeps the GUI responsive, parallelizes the heavy DSP, and centralizes all
+   I/O in the main thread. Expect 3-6x speedup on modern machines for 1000+ file
+   batches (bottleneck shifts to disk I/O).
+
+  ---
+  3. UI FRAMEWORK DECISION
+
+  CustomTkinter vs alternatives for audio tools
+  Framework: CustomTkinter
+  Modern UI: Good
+  Real-time Viz: Poor
+  Drag & Drop: Basic (tkdnd)
+  PyInstaller: Excellent
+  Audio App Fit: Adequate
+  ────────────────────────────────────────
+  Framework: PySide6 (Qt)
+  Modern UI: Excellent
+  Real-time Viz: Excellent
+  Drag & Drop: Native
+  PyInstaller: Good (larger)
+  Audio App Fit: Best
+  ────────────────────────────────────────
+  Framework: Flet
+  Modern UI: Excellent
+  Real-time Viz: Limited
+  Drag & Drop: Via Flutter
+  PyInstaller: Complex
+  Audio App Fit: Moderate
+  ────────────────────────────────────────
+  Framework: DearPyGui
+  Modern UI: Good
+  Real-time Viz: Excellent (GPU)
+  Drag & Drop: Manual
+  PyInstaller: Good
+  Audio App Fit: Good for viz
+  ────────────────────────────────────────
+  Framework: NiceGUI
+  Modern UI: Modern
+  Real-time Viz: Good (web charts)
+  Drag & Drop: Web-native
+  PyInstaller: Not applicable
+  Audio App Fit: Wrong fit
+  My recommendation: PySide6 for v3.0
+
+  Reasons specific to your use case:
+
+  1. Real-time loudness metering — Qt has QGraphicsView and QPainter for drawing
+   VU meters, loudness histograms, and waveform displays. CustomTkinter has no
+  equivalent without embedding matplotlib (heavy, slow).
+  2. Drag-and-drop — Qt handles native file drag-and-drop out of the box
+  (QDragEnterEvent). CustomTkinter requires the third-party tkdnd extension
+  which is fragile on Windows.
+  3. Table views for batch results — QTableView with QAbstractTableModel gives 
+  you sortable, scrollable batch result tables. Your current log window is a
+  text box; a proper table would let users sort by status, filter failures, etc.
+  4. Thread-safe signals — Qt's signal/slot system is thread-safe by design.
+  Your current root.after(0, lambda: ...) pattern works but is fragile. Qt
+  signals can cross thread boundaries natively.
+  5. PyInstaller compatibility — PySide6 produces larger executables (~80MB vs
+  ~30MB) but is well-supported. Use --exclude-module flags to strip unused Qt
+  modules (WebEngine, 3D, etc.) to bring it down to ~45MB.
+
+  Migration cost: Medium. Your GUI is ~800 lines. A PySide6 rewrite would be
+  ~600-700 lines (Qt's layout system is more concise). The core engine needs
+  zero changes.
+
+  If you want to stay lightweight: Keep CustomTkinter. It's working, it ships
+  small, and your v2.x users won't notice a difference. Only move to PySide6 if
+  you're adding real-time visualization (meters, waveforms) — that's where
+  CustomTkinter truly can't compete.
+
+  ---
+  4. v3.0 KILLER FEATURES — Game Audio Focus
+
+  Feature 1: LRA (Loudness Range) Analysis + Gating
+
+  What: Measure and report EBU R128 Loudness Range (LRA) for every file.
+  Optionally filter/flag files outside an LRA threshold (e.g., ASWG recommends
+  LRA < 20 LU for game dialogue).
+
+  Why it matters: Game audio middleware (Wwise, FMOD) expects consistent dynamic
+   range. A gunshot SFX with LRA of 25 LU next to dialogue at LRA 8 LU creates
+  mixing nightmares. Studios currently use Nugen or iZotope for this — having it
+   in a batch tool is a competitive advantage.
+
+  Implementation: pyloudnorm doesn't expose LRA directly, but you can compute it
+   from the gated short-term loudness distribution per EBU R128 s1.
+  Alternatively, use the loudness package or implement the algorithm
+  (percentile-based on short-term LUFS blocks).
+
+  CSV output: Add lra_lu column + optional lra_pass boolean.
+
+  Feature 2: BWF/iXML Metadata Injection
+
+  What: Write standardized metadata into output WAV files: originator,
+  description, loudness value, coding history, and iXML tags for Wwise/FMOD
+  import.
+
+  Why it matters: Game audio pipelines require metadata for asset management. 
+  Currently, after normalizing, engineers manually tag files or use a separate
+  tool. Embedding the LUFS value, target standard, and processing chain directly
+   into BWF chunks means Wwise can auto-read loudness and the DAM (digital asset
+   manager) can search/filter.
+
+  Implementation: Use soundfile to write WAV files (already doing this), then 
+  use the pysoundfile low-level API or a library like wavinfo to inject BEXT 
+  (Broadcast Extension) and iXML chunks. Key fields:
+  - LoudnessValue (BEXT)
+  - LoudnessRange (BEXT)
+  - MaxTruePeakLevel (BEXT)
+  - iXML: custom tags for ASWG standard, preset name, processing date
+
+  Feature 3: Watch Folder with Profile Presets
+
+  What: A "hot folder" mode where the normalizer monitors a directory and 
+  auto-processes new files using a saved profile (preset + settings). Output
+  goes to a configured destination. Multiple watch folders with different
+  profiles.
+
+  Why it matters: Game audio teams generate hundreds of SFX per day across
+  multiple designers. A watch folder per deliverable target (console build,
+  mobile build, trailer mix) eliminates manual batch runs entirely. This is how
+  professional facilities work (SADiE, Emotion Systems) — bringing that workflow
+   to indie/mid-size studios.
+
+  Implementation: Use watchdog library for filesystem monitoring. Each watch
+  profile stores: input path, output path, preset, bit depth, sample rate,
+  strict/drift mode. Run as a background service or a minimized tray icon
+  (PySide6 has QSystemTrayIcon).
+
+  ---
+  Summary of Actionable Items
+  Priority: P0 (Bug)
+  Item: Fix LUFS meter sample rate after resampling
+  Effort: 5 min
+  ────────────────────────────────────────
+  Priority: P0 (Bug)
+  Item: Add reason field to FAILED error dicts
+  Effort: 2 min
+  ────────────────────────────────────────
+  Priority: P1
+  Item: Eliminate redundant measure_true_peak in drift mode
+  Effort: 15 min
+  ────────────────────────────────────────
+  Priority: P1
+  Item: Log distinct status when drift mode attenuates below original level
+  Effort: 10 min
+  ────────────────────────────────────────
+  Priority: P2
+  Item: Implement ProcessPoolExecutor for batch parallelism
+  Effort: 2-3 hrs
+  ────────────────────────────────────────
+  Priority: P2
+  Item: LRA measurement + CSV column
+  Effort: 1-2 days
+  ────────────────────────────────────────
+  Priority: P3
+  Item: BWF/iXML metadata injection
+  Effort: 2-3 days
+  ────────────────────────────────────────
+  Priority: P3
+  Item: Watch folder mode
+  Effort: 3-5 days
+  ────────────────────────────────────────
+  Priority: P3
+  Item: PySide6 migration (if pursuing real-time viz)
+  Effort: 1-2 weeks
+  The P0 bugs are small fixes worth shipping in a v2.5.1 before starting v3.0
+  work. Want me to implement either of those fixes now?
+  C:\Users\mvita\AppData\Local\Temp\claude\meter-pyln.Meter-rate.sh (ctrl+y to 
+  copy)
+  C:\Users\mvita\AppData\Local\Temp\claude\final_lufs-meter.integrated_loudness-
+  nor.sh (ctrl+y to copy)
+  C:\Users\mvita\AppData\Local\Temp\claude\final_meter-pyln.Meter-output_rate.sh
+   (ctrl+y to copy)
+  C:\Users\mvita\AppData\Local\Temp\claude\original_peak-measure_true_peak-data.
+  sh (ctrl+y to copy)
+  C:\Users\mvita\AppData\Local\Temp\claude\Instead-of.sh (ctrl+y to copy)
+  C:\Users\mvita\AppData\Local\Temp\claude\from-concurrent.futures-import.sh 
+  (ctrl+y to copy)
+
+✻ Sautéed for 2m 6s
+
+❯ yes please.  lets fix the bugs first.  then i would like to archive       
+  v2.5.1 before beginning work on creating v3 where we go with all of your  
+  suggestions including switching to PySide6                                
+
+● I'll fix both P0 bugs in the core engine now.
+
+● Read 1 file (ctrl+o to expand)
+
+● Good. Now I'll apply all three changes: version bump, Bug 1 (meter sample
+  rate), and Bug 2 (missing reason field).
+
+● Update(normalize_lufs_core.py)
+  ⎿  Added 1 line, removed 1 line
+      32  from pathlib import Path
+      33  from datetime import datetime
+      34  
+      35 -VERSION = "2.5.0"                                              
+      35 +VERSION = "2.5.1"                                              
+      36  
+      37  # LUFS presets for common standards
+      38  LUFS_PRESETS = {
+
+● Update(normalize_lufs_core.py)
+  ⎿  Added 5 lines, removed 1 line
+       1  #!/usr/bin/env python3
+       2  """
+       3 -LUFS Normalizer Core Engine v2.5.0                             
+       3 +LUFS Normalizer Core Engine v2.5.1                             
+       4  Professional broadcast-grade audio normalization
+       5  
+       6 +Changes in v2.5.1:                                             
+       7 +- BUGFIX: LUFS meter now uses correct sample rate after resampl
+         +ing                                                            
+       8 +- BUGFIX: FAILED error dicts now include 'reason' field for uni
+         +form CSV schema                                                
+       9 +                                                               
+      10  Changes in v2.5.0:
+      11  - Expanded preset system (10 presets covering broadcast, stream
+          ing, podcast, game, film, music)
+      12  - Strict vs Drift mode toggle for peak handling
+
+● Now Bug 1 — fix the LUFS meter to use output_rate after resampling:
+
+● Update(normalize_lufs_core.py)
+  ⎿  Added 6 lines, removed 3 lines
+      522                  
+      523                  # Measure final values
+      524                  final_true_peak = measure_true_peak(normalized
+           _data, output_rate)
+      525 -                                                              
+      525 +                                                              
+      526 +                # Use correct sample rate for LUFS measurement
+          + after resampling                                             
+      527 +                final_meter = pyln.Meter(output_rate) if outpu
+          +t_rate != rate else meter                                     
+      528 +                                                              
+      529                  if normalized_data.ndim == 1:
+      527 -                    final_lufs = meter.integrated_loudness(nor
+          -malized_data.reshape(-1, 1))                                  
+      530 +                    final_lufs = final_meter.integrated_loudne
+          +ss(normalized_data.reshape(-1, 1))                            
+      531                  else:
+      529 -                    final_lufs = meter.integrated_loudness(nor
+          -malized_data)                                                 
+      532 +                    final_lufs = final_meter.integrated_loudne
+          +ss(normalized_data)                                           
+      533                  
+      534                  # Export with smart filename
+      535                  output_filename = get_output_filename(audio_pa
+           th.name, target_lufs)
+
+● Now Bug 2 — add missing reason field to FAILED error dicts:
+
+● Update(normalize_lufs_core.py)
+  ⎿  Added 2 lines, removed 1 line
+      582                  self.errors.append({
+      583                      'filename': audio_path.name,
+      584                      'error': str(e),
+      585 -                    'status': 'FAILED'                        
+      585 +                    'status': 'FAILED',                       
+      586 +                    'reason': 'exception'                     
+      587                  })
+      588                  if self.result_callback:
+      589                      self.result_callback(audio_path.name, 'FAI
+           LED', str(e))
+
+● Now update the GUI version to match:
+
+● Update(normalize_gui_modern.py)
+  ⎿  Added 4 lines, removed 1 line
+       1  #!/usr/bin/env python3
+       2  """
+       3 -LUFS Normalizer GUI v2.9.0 - Professional Edition              
+       3 +LUFS Normalizer GUI v2.9.1 - Professional Edition              
+       4  
+       5 +Changes in v2.9.1:                                             
+       6 +- BUGFIX: Core engine v2.5.1 integration (LUFS meter sample rat
+         +e fix)                                                         
+       7 +                                                               
+       8  Changes in v2.9.0:
+       9  - STRICT PRESET MATCHING: Changing Peak Ceiling now instantly u
+          pdates preset highlighting.
+      10  - LIVE VALIDATION: Preset matching happens on every keystroke (
+          no Enter needed).
+
+● Update(normalize_gui_modern.py)
+  ⎿  Added 1 line, removed 1 line
+      39  ctk.set_appearance_mode("dark")
+      40  ctk.set_default_color_theme("blue")
+      41  
+      42 -VERSION = "2.9.0"                                              
+      42 +VERSION = "2.9.1"                                              
+      43  
+      44  class CustomDialog(ctk.CTkToplevel):
+      45      def __init__(self, parent, title, message, width=400, heigh
+          t=250):
+
+● Let me verify both files look correct at the changed locations:
+
+● Read 1 file (ctrl+o to expand)
+
+● Both fixes are clean. Also fix the stale Version: line in the docstring:
+
+● Update(normalize_lufs_core.py)
+  ⎿  Added 1 line, removed 1 line
+      23  - Drift mode: Reduce gain to protect peak (LUFS may undershoot)
+      24  
+      25  Author: Mario Vitale
+      26 -Version: 2.5.0                                                 
+      26 +Version: 2.5.1                                                 
+      27  """
+      28  
+      29  import soundfile as sf
+
+● Both bugs are fixed. Now let's initialize git and archive v2.5.1 before
+  starting v3.0 work.
+
+● Bash(cd "C:\Users\mvita\Documents\claude-projects\LUFSNormalizer" && git init)
+  ⎿  Initialized empty Git repository in C:/Users/mvita/Documents/claude-pr
+     ojects/LUFSNormalizer/.git/
+
+● Bash(cd "C:\Users\mvita\Documents\claude-projects\LUFSNormalizer" && git
+      status)
+  ⎿  On branch master
+
+     No commits yet
+     … +31 lines (ctrl+o to expand)
+
+● Let me create a .gitignore to keep the repo clean, then commit everything as
+  the v2.5.1 archive.
+
+● Write(.gitignore)
+  ⎿  Wrote 1 lines to .gitignore
+      1 __pycache__/
+      2 build/
+      3 dist/
+      4 *.pyc
+
+● Bash(cd "C:\Users\mvita\Documents\claude-projects\LUFSNormalizer" && git add
+      .gitignore normalize_lufs_core.py normalize_gui_modern.py verify_audio.py
+      config.json re…)
+  ⎿  warning: in the working copy of 'LUFSNormalizer.code-workspace', LF wi
+     ll be replaced by CRLF the next time Git touches it
+     warning: in the working copy of 'RELEASE_NOTES_v2.4.1.txt', LF will be
+     … +12 lines (ctrl+o to expand)
+
+● Bash(cd "C:\Users\mvita\Documents\claude-projects\LUFSNormalizer" && git
+      commit -m "v2.5.1 - Bugfix release (archive before v3.0)…)
+  ⎿  Error: Exit code 128
+     Author identity unknown
+
+     *** Please tell me who you are.
+
+     Run
+
+       git config --global user.email "you@example.com"
+       git config --global user.name "Your Name"
+
+     … +4 lines (ctrl+o to see all)
+
+● Git needs your identity configured. Would you like me to set it for this
+  repository only? I'll need your name and email — or I can use "Mario Vitale"
+  with a placeholder email for the local repo config.
+
+● User answered Claude's questions:
+  ⎿  · What name and email should I configure for git in this repository? →
+      Mario Vitale (local)
+
+● Bash(cd "C:\Users\mvita\Documents\claude-projects\LUFSNormalizer" && git
+      config user.name "Mario Vitale" && git config user.email "mvitale@local")
+  ⎿  (No output)
+
+❯ my email is mariovitalesound@gmail.com and yes you can use my name as     
+  Mario Vitale.  i have an account on github now                            
+
+● Bash(cd "C:\Users\mvita\Documents\claude-projects\LUFSNormalizer" && git
+      config user.email "mariovitalesound@gmail.com")
+  ⎿  (No output)
+
+● Bash(cd "C:\Users\mvita\Documents\claude-projects\LUFSNormalizer" && git
+      commit -m "v2.5.1 - Bugfix release (archive before v3.0)…)
+  ⎿  [master (root-commit) 8779acf] v2.5.1 - Bugfix release (archive before
+      v3.0)
+      21 files changed, 2938 insertions(+)
+     … +19 lines (ctrl+o to expand)
+
+● Now let me tag it so you have a clean archive point:
+
+● Bash(cd "C:\Users\mvita\Documents\claude-projects\LUFSNormalizer" && git tag
+      -a v2.5.1 -m "v2.5.1 - Final CustomTkinter release before v3.0 rewrite")
+  ⎿  (No output)
+
+● Bash(cd "C:\Users\mvita\Documents\claude-projects\LUFSNormalizer" && git log
+      --oneline --decorate && echo "---" && git tag -l)
+  ⎿  8779acf (HEAD -> master, tag: v2.5.1) v2.5.1 - Bugfix release (archive
+      before v3.0)
+     ---
+     v2.5.1
+
+● v2.5.1 is archived and tagged. You've got a clean checkpoint:
+
+  - Commit 8779acf — all source files with both bugfixes
+  - Tag v2.5.1 — you can always return here with git checkout v2.5.1
+
+  Ready to start planning v3.0 when you are. That'll involve the PySide6
+  rewrite, ProcessPoolExecutor parallelism, LRA analysis, BWF/iXML metadata, and
+   watch folder mode. Want me to begin with a v3.0 implementation plan?
+
+✻ Cooked for 2m 0s
+
+❯ yes please 
+
+● Entered plan mode
+  Claude is now exploring and designing an implementation approach.
+
+● Let me explore the codebase thoroughly to understand the full scope before
+  designing the v3.0 plan.
+
+● Explore(Analyze GUI patterns and deps)
+  ⎿  Done (1 tool use · 41.7k tokens · 1m 41s)
+
+● Excellent exploration results. Now let me design the implementation strategy.
+
+● Plan(Design v3.0 implementation plan)
+  ⎿  Done (18 tool uses · 67.1k tokens · 5m 5s)
+
+● Now let me write the final plan, synthesizing all the exploration and design
+  work.
+
+● Updated plan
+  ⎿  /plan to preview
+
+● Before I finalize, one question about scope:
+
+● User answered Claude's questions:
+  ⎿  · For the Watch Folder feature, should it be integrated as a tab/panel
+      within the main GUI window, or as a separate standalone window? → Tab
+      in main window (Recommended)
+     · How should we approach the implementation? Build everything at once,
+      or phase by phase with working commits between each? → Phase by phase
+      (Recommended)
+
+● Good — tab in main window and phase-by-phase with commits. Let me update the
+  plan with those decisions.
+
+● Updated plan
+  ⎿  /plan to preview
+
+● Updated plan
+  ⎿  /plan to preview
+
+● The plan is complete. Let me present it for approval.
+  ⎿  User rejected Claude's plan:
+     ╭─────────────────────────────────────────────────────────────────────────╮
+     │ LUFS Normalizer v3.0 Implementation Plan                                │
+     │                                                                         │
+     │ Context                                                                 │
+     │                                                                         │
+     │ The LUFS Normalizer is a professional batch audio normalization tool    │
+     │ (v2.5.1, tagged and archived). The current version uses CustomTkinter   │
+     │ for the GUI, processes files sequentially, and lacks advanced features  │
+     │ expected by game audio professionals (LRA, metadata, watch folders).    │
+     │ v3.0 is a major rewrite that migrates to PySide6, adds parallel         │
+     │ processing, and introduces three killer features.                       │
+     │                                                                         │
+     │ Architecture: Package Structure                                         │
+     │                                                                         │
+     │ Restructure from 2 flat files into a proper Python package:             │
+     │ LUFSNormalizer/                                                         │
+     │ ├── lufs_normalizer/                                                    │
+     │ │   ├── __init__.py              (VERSION, package exports)             │
+     │ │   ├── core/                                                           │
+     │ │   │   ├── __init__.py                                                 │
+     │ │   │   ├── engine.py            (LUFSNormalizer class — batch          │
+     │ orchestration)                                                          │
+     │ │   │   ├── processor.py         (process_single_file — standalone,     │
+     │ serializable)                                                           │
+     │ │   │   ├── measurement.py       (measure_true_peak, measure_lra, LUFS  │
+     │ helpers)                                                                │
+     │ │   │   ├── dither.py            (apply_tpdf_dither)                    │
+     │ │   │   ├── metadata.py          (BWF BEXT + iXML chunk writing)        │
+     │ │   │   └── presets.py           (LUFS_PRESETS dict, apply/get/info     │
+     │ functions)                                                              │
+     │ │   ├── gui/                                                            │
+     │ │   │   ├── __init__.py                                                 │
+     │ │   │   ├── app.py               (QApplication setup, dark theme, entry │
+     │  point)                                                                 │
+     │ │   │   ├── main_window.py       (Main window — all panels)             │
+     │ │   │   ├── preset_manager.py    (Preset manager dialog with drag-drop) │
+     │ │   │   ├── log_dialog.py        (Processing log dialog)                │
+     │ │   │   ├── about_dialog.py      (About dialog)                         │
+     │ │   │   ├── watch_panel.py       (Watch folder tab/panel)               │
+     │ │   │   ├── widgets.py           (SpinnerEntry, PresetButton, custom    │
+     │ widgets)                                                                │
+     │ │   │   └── worker.py            (QThread worker + signals for batch    │
+     │ processing)                                                             │
+     │ │   ├── watcher/                                                        │
+     │ │   │   ├── __init__.py                                                 │
+     │ │   │   └── folder_watcher.py    (watchdog-based folder monitoring)     │
+     │ │   ├── cli.py                   (argparse CLI entry point)             │
+     │ │   └── config.py                (Config load/save/migrate, v2→v3       │
+     │ migration)                                                              │
+     │ ├── normalize_lufs_core.py       (Backward-compat shim: re-exports from │
+     │  lufs_normalizer.core)                                                  │
+     │ ├── normalize_gui_modern.py      (Backward-compat shim: launches        │
+     │ lufs_normalizer.gui.app)                                                │
+     │ ├── verify_audio.py              (Keep as-is, update imports)           │
+     │ ├── requirements.txt             (Updated for PySide6)                  │
+     │ ├── LUFS_Normalizer.spec         (Updated for PySide6 + package         │
+     │ structure)                                                              │
+     │ ├── build.bat                    (Updated)                              │
+     │ ├── config.json                  (Auto-migrated on first v3 launch)     │
+     │ └── (icons, release notes, etc.)                                        │
+     │                                                                         │
+     │ Phases                                                                  │
+     │                                                                         │
+     │ Phase 0: Package Restructure (no behavior changes)                      │
+     │                                                                         │
+     │ Goal: Move existing code into the package structure without changing    │
+     │ any logic. All existing functionality continues to work.                │
+     │                                                                         │
+     │ Steps:                                                                  │
+     │ 1. Create lufs_normalizer/ directory tree                               │
+     │ 2. Extract from normalize_lufs_core.py:                                 │
+     │   - presets.py — LUFS_PRESETS, DEFAULT_FAVORITES, apply_lufs_preset(),  │
+     │ get_preset_for_lufs(), get_preset_info()                                │
+     │   - measurement.py — measure_true_peak()                                │
+     │   - dither.py — apply_tpdf_dither()                                     │
+     │   - processor.py — New standalone process_single_file() extracted from  │
+     │ the loop body in normalize_batch()                                      │
+     │   - engine.py — LUFSNormalizer class (batch orchestration, CSV writing, │
+     │  logging)                                                               │
+     │   - __init__.py — get_output_filename(), VERSION                        │
+     │ 3. Create config.py — extract config load/save/migrate from GUI         │
+     │ 4. Create backward-compat shims so import normalize_lufs_core still     │
+     │ works                                                                   │
+     │ 5. Keep normalize_gui_modern.py working with old CustomTkinter (imports │
+     │  from new package)                                                      │
+     │                                                                         │
+     │ Verify: Run existing GUI, run CLI, confirm identical behavior.          │
+     │                                                                         │
+     │ Phase 1: PySide6 GUI Migration                                          │
+     │                                                                         │
+     │ Goal: Replace CustomTkinter GUI with PySide6. Feature-parity with       │
+     │ v2.5.1.                                                                 │
+     │                                                                         │
+     │ Key mappings:                                                           │
+     │ ┌──────────────────────────────┬─────────────────────────────────────── │
+     │ ────┐                                                                   │
+     │ │        CustomTkinter         │                  PySide6               │
+     │     │                                                                   │
+     │ ├──────────────────────────────┼─────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ ctk.CTk()                    │ QMainWindow                            │
+     │     │                                                                   │
+     │ ├──────────────────────────────┼─────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ CTkScrollableFrame           │ QScrollArea + QWidget                  │
+     │     │                                                                   │
+     │ ├──────────────────────────────┼─────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ CTkEntry + StringVar.trace() │ QLineEdit + textChanged signal         │
+     │     │                                                                   │
+     │ ├──────────────────────────────┼─────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ CTkButton                    │ QPushButton                            │
+     │     │                                                                   │
+     │ ├──────────────────────────────┼─────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ CTkCheckBox                  │ QCheckBox                              │
+     │     │                                                                   │
+     │ ├──────────────────────────────┼─────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ CTkOptionMenu                │ QComboBox                              │
+     │     │                                                                   │
+     │ ├──────────────────────────────┼─────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ CTkProgressBar               │ QProgressBar                           │
+     │     │                                                                   │
+     │ ├──────────────────────────────┼─────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ CTkTextbox                   │ QPlainTextEdit                         │
+     │     │                                                                   │
+     │ ├──────────────────────────────┼─────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ CTkToplevel                  │ QDialog                                │
+     │     │                                                                   │
+     │ ├──────────────────────────────┼─────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ root.after(0, fn)            │ Custom QThread signals (auto           │
+     │ thread-safe) │                                                          │
+     │ ├──────────────────────────────┼─────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ threading.Thread + callbacks │ QThread subclass + pyqtSignal          │
+     │     │                                                                   │
+     │ ├──────────────────────────────┼─────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ pack() / grid()              │ QVBoxLayout / QHBoxLayout /            │
+     │ QGridLayout   │                                                         │
+     │ └──────────────────────────────┴─────────────────────────────────────── │
+     │ ────┘                                                                   │
+     │ Steps:                                                                  │
+     │ 1. gui/app.py — QApplication with dark theme (Fusion palette or QSS     │
+     │ stylesheet)                                                             │
+     │ 2. gui/main_window.py — Recreate all panels: I/O, presets, settings,    │
+     │ format, options, process controls, footer                               │
+     │ 3. gui/widgets.py — SpinnerEntry (QLineEdit + up/down QPushButtons,     │
+     │ keyboard Up/Down/Shift support), PresetButton (QPushButton with         │
+     │ two-line text, highlight state)                                         │
+     │ 4. gui/worker.py — QThread subclass with signals: progress(int, int,    │
+     │ str), file_result(str, str, str), finished(int, int, str, str, str),    │
+     │ error(str). Replaces the daemon thread + root.after() pattern.          │
+     │ 5. gui/preset_manager.py — QDialog with two QListWidgets. Favorites     │
+     │ list uses QListWidget.setDragDropMode(InternalMove) for native drag     │
+     │ reorder. Available list has add/remove buttons.                         │
+     │ 6. gui/log_dialog.py — QDialog with QPlainTextEdit (Consolas 11pt),     │
+     │ error text colored red via QTextCharFormat                              │
+     │ 7. gui/about_dialog.py — QDialog with QScrollArea, sections as QLabel   │
+     │ pairs                                                                   │
+     │ 8. File/folder dialogs: QFileDialog.getExistingDirectory()              │
+     │ 9. Message dialogs: QMessageBox replacing CustomDialog                  │
+     │ 10. Update requirements.txt: replace customtkinter>=5.2.0 with          │
+     │ PySide6>=6.6.0                                                          │
+     │                                                                         │
+     │ Verify: Launch GUI, test all workflows: select folders, pick presets,   │
+     │ adjust LUFS/peak, start/stop processing, check log window, preset       │
+     │ manager drag reorder, about dialog.                                     │
+     │                                                                         │
+     │ Phase 2: Parallel Processing (ProcessPoolExecutor)                      │
+     │                                                                         │
+     │ Goal: Process files in parallel for 3-6x speedup on 1000+ file batches. │
+     │                                                                         │
+     │ Steps:                                                                  │
+     │ 1. core/processor.py — process_single_file(audio_path, target_lufs,     │
+     │ peak_ceiling, strict_lufs_matching, bit_depth, sample_rate, output_dir, │
+     │  ...) as a module-level function. Returns a result dict:                │
+     │ {                                                                       │
+     │     'type': 'success' | 'skipped' | 'error',                            │
+     │     'filename': str,                                                    │
+     │     'result': {...},      # For CSV (success)                           │
+     │     'skipped': {...},     # For needs_limiting CSV                      │
+     │     'error': {...},       # For error tracking                          │
+     │     'output_file': str,   # Path to written file (or copied file)       │
+     │     'log_messages': [...]  # Collected log lines                        │
+     │ }                                                                       │
+     │ 2. core/engine.py — Add normalize_batch_parallel() method using         │
+     │ ProcessPoolExecutor(max_workers=os.cpu_count()). Main thread iterates   │
+     │ as_completed(futures), calls callbacks, collects results.               │
+     │ stop_requested implemented via multiprocessing.Event.                   │
+     │ 3. Handle random seeding: pass file index as seed offset to each worker │
+     │  for deterministic TPDF dither.                                         │
+     │ 4. CLI gets --parallel / --workers N flags.                             │
+     │ 5. GUI defaults to parallel mode, with worker count in settings.        │
+     │                                                                         │
+     │ Verify: Process a batch of 10+ files, confirm identical output to       │
+     │ sequential mode. Benchmark parallel vs sequential on a large batch.     │
+     │                                                                         │
+     │ Phase 3: LRA (Loudness Range) Measurement                               │
+     │                                                                         │
+     │ Goal: Measure and report EBU R128 Loudness Range for every processed    │
+     │ file.                                                                   │
+     │                                                                         │
+     │ Implementation in core/measurement.py:                                  │
+     │ 1. Implement measure_lra(audio_data, sample_rate) per EBU R128 s1:      │
+     │   - Compute short-term loudness (3s window, 400ms hop) using            │
+     │ pyloudnorm's gating filter                                              │
+     │   - Apply absolute gate at -70 LUFS                                     │
+     │   - Apply relative gate at -20 LU below ungated mean                    │
+     │   - LRA = difference between 95th and 10th percentile of gated          │
+     │ distribution                                                            │
+     │ 2. Add lra_lu column to CSV report (in engine.py and processor.py)      │
+     │ 3. GUI: display LRA in log results for each file                        │
+     │ 4. Optional: add LRA threshold setting (flag files outside range)       │
+     │                                                                         │
+     │ Verify: Process known reference files, compare LRA values against a     │
+     │ reference tool (e.g., ffmpeg loudnorm filter or dpMeter).               │
+     │                                                                         │
+     │ Phase 4: BWF/iXML Metadata Injection                                    │
+     │                                                                         │
+     │ Goal: Embed broadcast metadata into output WAV files for game audio     │
+     │ pipelines.                                                              │
+     │                                                                         │
+     │ Implementation in core/metadata.py:                                     │
+     │ 1. inject_bext_chunk(wav_path, metadata_dict) — Write BEXT chunk into   │
+     │ existing WAV file after soundfile writes it. Key fields:                │
+     │   - Description (256 chars) — e.g., "Normalized to -24 LUFS by LUFS     │
+     │ Normalizer v3.0"                                                        │
+     │   - Originator (32 chars) — "LUFS Normalizer"                           │
+     │   - OriginatorReference (32 chars)                                      │
+     │   - OriginationDate (10 chars, yyyy-mm-dd)                              │
+     │   - OriginationTime (8 chars, hh:mm:ss)                                 │
+     │   - LoudnessValue (int16, LUFS * 100)                                   │
+     │   - LoudnessRange (int16, LRA * 100)                                    │
+     │   - MaxTruePeakLevel (int16, dBTP * 100)                                │
+     │ 2. inject_ixml_chunk(wav_path, xml_string) — Optional iXML for          │
+     │ Wwise/FMOD metadata                                                     │
+     │ 3. Direct binary RIFF chunk writing (no extra dependency needed — WAV   │
+     │ RIFF format is simple)                                                  │
+     │ 4. GUI: checkbox "Embed BWF metadata" in options panel                  │
+     │ 5. CLI: --bwf flag                                                      │
+     │                                                                         │
+     │ Verify: Write a file with metadata, open in MediaInfo or BWF MetaEdit   │
+     │ to confirm chunks are valid.                                            │
+     │                                                                         │
+     │ Phase 5: Watch Folder Mode                                              │
+     │                                                                         │
+     │ Goal: Auto-process audio files as they appear in a monitored directory. │
+     │                                                                         │
+     │ Implementation:                                                         │
+     │ 1. watcher/folder_watcher.py — Uses watchdog library:                   │
+     │   - FolderWatcher class monitors a directory for new .wav/.aiff files   │
+     │   - On new file detected: wait for write completion (poll file size     │
+     │ stability), then queue for processing                                   │
+     │   - Uses a saved "profile" (preset + all processing settings)           │
+     │   - Output to configured destination                                    │
+     │ 2. gui/watch_panel.py — Tab in main window (QTabWidget: "Batch" tab +   │
+     │ "Watch" tab):                                                           │
+     │   - Watch folder path (Browse)                                          │
+     │   - Output folder path (Browse)                                         │
+     │   - Profile selector (dropdown of presets + current custom settings)    │
+     │   - Start Watch / Stop Watch button                                     │
+     │   - Activity log (files processed, errors)                              │
+     │   - Main window gains a QTabWidget with "Batch Processing" (existing    │
+     │ UI) and "Watch Folder" tabs                                             │
+     │ 3. CLI: --watch INPUT_DIR OUTPUT_DIR mode                               │
+     │ 4. Add watchdog>=3.0.0 to requirements.txt                              │
+     │                                                                         │
+     │ Verify: Start watch mode, drop a WAV file into the watched folder,      │
+     │ confirm it's processed and output appears.                              │
+     │                                                                         │
+     │ Phase 6: Build & Polish                                                 │
+     │                                                                         │
+     │ 1. Update LUFS_Normalizer.spec for PySide6:                             │
+     │   - Hidden imports: PySide6.QtWidgets, PySide6.QtCore, PySide6.QtGui    │
+     │   - Exclude unused Qt modules: PySide6.QtWebEngine, PySide6.Qt3D,       │
+     │ PySide6.QtMultimedia                                                    │
+     │   - Data files: config.json, icons                                      │
+     │ 2. Update build.bat                                                     │
+     │ 3. Update requirements.txt (final):                                     │
+     │ PySide6>=6.6.0                                                          │
+     │ soundfile>=0.12.1                                                       │
+     │ pyloudnorm>=0.1.1                                                       │
+     │ numpy>=1.21.0                                                           │
+     │ soxr>=0.3.0                                                             │
+     │ watchdog>=3.0.0                                                         │
+     │ Pillow>=9.0.0                                                           │
+     │ scipy>=1.7.0  # optional fallback                                       │
+     │ 4. Config migration: config.py auto-detects v2.x config and migrates    │
+     │ (add new fields, preserve existing values)                              │
+     │ 5. Update README.md                                                     │
+     │ 6. Write RELEASE_NOTES_v3.0.0.txt                                       │
+     │ 7. Test PyInstaller build end-to-end                                    │
+     │                                                                         │
+     │ Implementation Order & Risk                                             │
+     │ ┌─────────────────────────┬────────┬────────┬────────────────────────── │
+     │ ─┐                                                                      │
+     │ │          Phase          │  Risk  │ Effort │       Dependencies        │
+     │  │                                                                      │
+     │ ├─────────────────────────┼────────┼────────┼────────────────────────── │
+     │ ─┤                                                                      │
+     │ │ 0 - Package restructure │ Low    │ Medium │ None                      │
+     │  │                                                                      │
+     │ ├─────────────────────────┼────────┼────────┼────────────────────────── │
+     │ ─┤                                                                      │
+     │ │ 1 - PySide6 migration   │ High   │ Large  │ Phase 0                   │
+     │  │                                                                      │
+     │ ├─────────────────────────┼────────┼────────┼────────────────────────── │
+     │ ─┤                                                                      │
+     │ │ 2 - Parallel processing │ Medium │ Medium │ Phase 0                   │
+     │  │                                                                      │
+     │ ├─────────────────────────┼────────┼────────┼────────────────────────── │
+     │ ─┤                                                                      │
+     │ │ 3 - LRA measurement     │ Low    │ Small  │ Phase 0                   │
+     │  │                                                                      │
+     │ ├─────────────────────────┼────────┼────────┼────────────────────────── │
+     │ ─┤                                                                      │
+     │ │ 4 - BWF metadata        │ Low    │ Medium │ Phase 3 (needs LRA value) │
+     │  │                                                                      │
+     │ ├─────────────────────────┼────────┼────────┼────────────────────────── │
+     │ ─┤                                                                      │
+     │ │ 5 - Watch folder        │ Low    │ Medium │ Phase 0                   │
+     │  │                                                                      │
+     │ ├─────────────────────────┼────────┼────────┼────────────────────────── │
+     │ ─┤                                                                      │
+     │ │ 6 - Build & polish      │ Low    │ Small  │ All phases                │
+     │  │                                                                      │
+     │ └─────────────────────────┴────────┴────────┴────────────────────────── │
+     │ ─┘                                                                      │
+     │ Phases 2, 3, 4, 5 are independent of Phase 1 (they're core/watcher      │
+     │ changes). We can work on them in parallel with or after Phase 1.        │
+     │                                                                         │
+     │ Approach: Phase by phase with a working git commit after each phase.    │
+     │ Each milestone is testable independently before moving on.              │
+     │                                                                         │
+     │ Files Modified/Created Summary                                          │
+     │                                                                         │
+     │ New files (21):                                                         │
+     │ - lufs_normalizer/__init__.py                                           │
+     │ - lufs_normalizer/core/__init__.py, engine.py, processor.py,            │
+     │ measurement.py, dither.py, metadata.py, presets.py                      │
+     │ - lufs_normalizer/gui/__init__.py, app.py, main_window.py,              │
+     │ preset_manager.py, log_dialog.py, about_dialog.py, watch_panel.py,      │
+     │ widgets.py, worker.py                                                   │
+     │ - lufs_normalizer/watcher/__init__.py, folder_watcher.py                │
+     │ - lufs_normalizer/cli.py, lufs_normalizer/config.py                     │
+     │                                                                         │
+     │ Modified files (5):                                                     │
+     │ - normalize_lufs_core.py (becomes backward-compat shim)                 │
+     │ - normalize_gui_modern.py (becomes backward-compat shim)                │
+     │ - requirements.txt                                                      │
+     │ - LUFS_Normalizer.spec                                                  │
+     │ - build.bat                                                             │
+     │                                                                         │
+     │ Unchanged files:                                                        │
+     │ - verify_audio.py (update imports only)                                 │
+     │ - config.json (auto-migrated at runtime)                                │
+     │ - All icon files, release notes, archived versions                      │
+     │ C:\Users\mvita\AppData\Local\Temp\claude\LUFSNormalizer.sh (ctrl+y to   │
+     │ copy)                                                                   │
+     ╰─────────────────────────────────────────────────────────────────────────╯

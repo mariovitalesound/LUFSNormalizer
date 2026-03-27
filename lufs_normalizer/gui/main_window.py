@@ -206,8 +206,10 @@ class MainWindow(QMainWindow):
 
         format_layout.addWidget(QLabel("Bit Depth:"))
         self.bit_depth_combo = QComboBox()
-        self.bit_depth_combo.addItems(['preserve', '16', '24', '32'])
-        self.bit_depth_combo.setCurrentText(self.config.get('bit_depth', 'preserve'))
+        for label, value in [('Source', 'preserve'), ('16', '16'), ('24', '24'), ('32', '32')]:
+            self.bit_depth_combo.addItem(label, value)
+        self.bit_depth_combo.setCurrentIndex(
+            self.bit_depth_combo.findData(self.config.get('bit_depth', 'preserve')))
         self.bit_depth_combo.setFixedWidth(100)
         format_layout.addWidget(self.bit_depth_combo)
 
@@ -215,8 +217,10 @@ class MainWindow(QMainWindow):
 
         format_layout.addWidget(QLabel("Sample Rate:"))
         self.sample_rate_combo = QComboBox()
-        self.sample_rate_combo.addItems(['preserve', '44100 Hz', '48000 Hz'])
-        self.sample_rate_combo.setCurrentText(self.config.get('sample_rate', 'preserve'))
+        for label, value in [('Source', 'preserve'), ('44100 Hz', '44100 Hz'), ('48000 Hz', '48000 Hz')]:
+            self.sample_rate_combo.addItem(label, value)
+        self.sample_rate_combo.setCurrentIndex(
+            self.sample_rate_combo.findData(self.config.get('sample_rate', 'preserve')))
         self.sample_rate_combo.setFixedWidth(110)
         format_layout.addWidget(self.sample_rate_combo)
 
@@ -252,9 +256,12 @@ class MainWindow(QMainWindow):
         self.strict_lufs_cb = QCheckBox("Strict LUFS matching")
         self.strict_lufs_cb.setChecked(self.config.get('strict_lufs_matching', True))
         strict_row.addWidget(self.strict_lufs_cb)
-        strict_help = QPushButton("?")
+        strict_help = QPushButton("i")
         strict_help.setFixedSize(20, 20)
-        strict_help.setStyleSheet("background-color: #555555; font-size: 10px;")
+        strict_help.setStyleSheet(
+            "background-color: #555555; font-size: 10px; font-style: italic; "
+            "font-weight: bold; border-radius: 10px;"
+        )
         strict_help.clicked.connect(self._show_strict_help)
         strict_row.addWidget(strict_help)
         strict_row.addStretch()
@@ -448,10 +455,11 @@ class MainWindow(QMainWindow):
         input_folder = self.input_entry.text()
         if input_folder and Path(input_folder).exists():
             input_path = Path(input_folder)
-            wav_files = list(input_path.glob('*.wav')) + list(input_path.glob('*.WAV'))
-            aiff_files = (list(input_path.glob('*.aiff')) + list(input_path.glob('*.AIFF')) +
-                          list(input_path.glob('*.aif')) + list(input_path.glob('*.AIF')))
-            count = len(wav_files) + len(aiff_files)
+            seen = set()
+            for pattern in ('*.wav', '*.WAV', '*.aiff', '*.AIFF', '*.aif', '*.AIF'):
+                for f in input_path.glob(pattern):
+                    seen.add(f.resolve())
+            count = len(seen)
             self.file_count_label.setText(f"{count} audio files found")
             self.start_btn.setText(f"Start Processing ({count})")
             self._file_count = count
@@ -508,8 +516,8 @@ class MainWindow(QMainWindow):
         self.worker.output_dir = self.output_entry.text()
         self.worker.target_lufs = float(self.target_spinner.text())
         self.worker.peak_ceiling = float(self.peak_entry.text())
-        self.worker.bit_depth = self.bit_depth_combo.currentText()
-        self.worker.sample_rate = self.sample_rate_combo.currentText()
+        self.worker.bit_depth = self.bit_depth_combo.currentData()
+        self.worker.sample_rate = self.sample_rate_combo.currentData()
         self.worker.use_batch_folders = self.batch_folders_cb.isChecked()
         self.worker.generate_log = self.generate_log_cb.isChecked()
         self.worker.generate_csv = self.generate_csv_cb.isChecked()
@@ -562,7 +570,8 @@ class MainWindow(QMainWindow):
 
         skipped = len(self.worker.normalizer.skipped_files)
         errors = len(self.worker.normalizer.errors)
-        has_issues = skipped > 0 or errors > 0 or success < total
+        silent = len(self.worker.normalizer.skipped_silent)
+        has_issues = skipped > 0 or errors > 0
 
         self._log_message("")
         self._log_message("=" * 50)
@@ -570,6 +579,8 @@ class MainWindow(QMainWindow):
         if skipped > 0:
             self._log_message(f"NEEDS LIMITING: {skipped} files exceeded peak ceiling", is_error=True)
             self._log_message(f"   -> Copied to 'needs_limiting/' folder", is_error=True)
+        if silent > 0:
+            self._log_message(f"SKIPPED: {silent} silent/too-quiet files")
         if errors > 0:
             self._log_message(f"ERRORS: {errors} files failed", is_error=True)
         self._log_message("=" * 50)
@@ -660,8 +671,8 @@ class MainWindow(QMainWindow):
             'favorite_presets': self.favorite_presets,
             'strict_lufs_matching': self.strict_lufs_cb.isChecked(),
             'auto_open_output': self.auto_open_cb.isChecked(),
-            'bit_depth': self.bit_depth_combo.currentText(),
-            'sample_rate': self.sample_rate_combo.currentText(),
+            'bit_depth': self.bit_depth_combo.currentData(),
+            'sample_rate': self.sample_rate_combo.currentData(),
             'use_batch_folders': self.batch_folders_cb.isChecked(),
             'generate_log': self.generate_log_cb.isChecked(),
             'generate_csv': self.generate_csv_cb.isChecked(),
