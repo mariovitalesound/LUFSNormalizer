@@ -1,4 +1,45 @@
-__pycache__/
-build/
+# Build artifacts
 dist/
+build/
+*.spec
+!LUFSNormalizer_v3.0.0.spec
+
+# Python
+__pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+
+# Test directories
+test_input/
+test_output/
+
+# Archives
+Archived Versions/
+*.zip
+*.7z
+
+# IDE / editor
+*.code-workspace
+.vscode/
+
+# Dev-only scripts
+generate_test_files.py
+
+# Root config (user-specific settings)
+/config.json
+
+# Session / handoff files
+session_history.txt
+handoff_summary.txt
+
+# Pip artifacts
+=*
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# PyInstaller
+*.manifest
