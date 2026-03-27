@@ -15,5 +15,11 @@
     "sample_rate": "preserve",
     "use_batch_folders": true,
     "generate_log": true,
-    "generate_csv": true
+    "generate_csv": true,
+    "embed_bwf": false,
+    "parallel_processing": true,
+    "parallel_workers": 0,
+    "watch_input_folder": "",
+    "watch_output_folder": "",
+    "config_version": 3
 }

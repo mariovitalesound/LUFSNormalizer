@@ -1,38 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+
 a = Analysis(
     ['normalize_gui_modern.py'],
     pathex=[],
     binaries=[],
-    datas=[
-        ('config.json', '.'),
-        ('taskbar_icon.ico', '.'),
-        ('lufs_normalizer', 'lufs_normalizer'),
-    ],
-    hiddenimports=[
-        'PySide6.QtWidgets',
-        'PySide6.QtCore',
-        'PySide6.QtGui',
-        'soundfile',
-        'pyloudnorm',
-        'soxr',
-        'numpy',
-        'watchdog',
-        'watchdog.observers',
-        'watchdog.events',
-    ],
+    datas=[('config.json', '.'), ('lufs_normalizer', 'lufs_normalizer')],
+    hiddenimports=['PySide6.QtWidgets', 'PySide6.QtCore', 'PySide6.QtGui', 'soundfile', 'pyloudnorm', 'soxr', 'numpy', 'watchdog'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[
-        'PySide6.QtWebEngine',
-        'PySide6.Qt3D',
-        'PySide6.QtMultimedia',
-        'PySide6.QtQuick',
-        'PySide6.QtQml',
-        'customtkinter',
-        'tkinter',
-    ],
+    excludes=['PySide6.QtWebEngine', 'PySide6.Qt3D', 'PySide6.QtMultimedia', 'PySide6.QtQuick', 'customtkinter', 'tkinter'],
     noarchive=False,
     optimize=0,
 )
@@ -44,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='LUFS_Normalizer',
+    name='LUFSNormalizer_v3.0.0',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
