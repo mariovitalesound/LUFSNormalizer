@@ -38,8 +38,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"LUFS Normalizer v{VERSION}")
-        self.setMinimumSize(700, 850)
-        self.resize(720, 880)
+        self.setMinimumSize(750, 950)
+        self.resize(760, 980)
 
         # Paths
         if getattr(sys, 'frozen', False):
@@ -121,7 +121,10 @@ class MainWindow(QMainWindow):
 
         about_btn = QPushButton("About")
         about_btn.setFixedSize(70, 26)
-        about_btn.setStyleSheet("background-color: transparent; color: gray; font-size: 11px;")
+        about_btn.setStyleSheet("""
+            QPushButton { background-color: #444444; color: #cccccc; font-size: 11px; border-radius: 4px; }
+            QPushButton:hover { background-color: #555555; color: white; }
+        """)
         about_btn.clicked.connect(self._toggle_about)
         title_row.addWidget(about_btn)
         layout.addLayout(title_row)
@@ -187,11 +190,9 @@ class MainWindow(QMainWindow):
         settings_layout.addSpacing(20)
 
         settings_layout.addWidget(QLabel("Peak Ceiling:"))
-        self.peak_entry = QLineEdit(str(self.config.get('peak_ceiling', -1.0)))
-        self.peak_entry.setFixedWidth(60)
-        self.peak_entry.setAlignment(Qt.AlignCenter)
-        self.peak_entry.textChanged.connect(self._on_manual_entry)
-        settings_layout.addWidget(self.peak_entry)
+        self.peak_spinner = SpinnerEntry(str(self.config.get('peak_ceiling', -1.0)), width=70)
+        self.peak_spinner.valueChanged.connect(self._on_manual_entry)
+        settings_layout.addWidget(self.peak_spinner)
 
         dbtp_label = QLabel("dBTP")
         dbtp_label.setStyleSheet("color: gray;")
@@ -256,12 +257,15 @@ class MainWindow(QMainWindow):
         self.strict_lufs_cb = QCheckBox("Strict LUFS matching")
         self.strict_lufs_cb.setChecked(self.config.get('strict_lufs_matching', True))
         strict_row.addWidget(self.strict_lufs_cb)
-        strict_help = QPushButton("i")
+        strict_help = QPushButton("?")
         strict_help.setFixedSize(20, 20)
-        strict_help.setStyleSheet(
-            "background-color: #555555; font-size: 10px; font-style: italic; "
-            "font-weight: bold; border-radius: 10px;"
-        )
+        strict_help.setStyleSheet("""
+            QPushButton {
+                background-color: #555555; color: white; font-size: 12px;
+                font-weight: bold; border-radius: 10px; padding: 0;
+            }
+            QPushButton:hover { background-color: #777777; }
+        """)
         strict_help.clicked.connect(self._show_strict_help)
         strict_row.addWidget(strict_help)
         strict_row.addStretch()
@@ -395,7 +399,7 @@ class MainWindow(QMainWindow):
         self._setting_preset = True
         lufs, peak = apply_lufs_preset(preset_name)
         self.target_spinner.setText(str(lufs))
-        self.peak_entry.setText(str(peak))
+        self.peak_spinner.setText(str(peak))
         self._update_preset_highlights(preset_name)
         self.selected_preset = preset_name
         self._setting_preset = False
@@ -410,7 +414,7 @@ class MainWindow(QMainWindow):
             return
         try:
             lufs_val = float(self.target_spinner.text())
-            peak_val = float(self.peak_entry.text())
+            peak_val = float(self.peak_spinner.text())
             matching = get_preset_for_lufs(lufs_val, peak_val)
         except ValueError:
             matching = None
@@ -484,7 +488,7 @@ class MainWindow(QMainWindow):
             return False
         try:
             float(self.target_spinner.text())
-            float(self.peak_entry.text())
+            float(self.peak_spinner.text())
         except ValueError:
             QMessageBox.warning(self, "Error", "Invalid LUFS or Peak value.")
             return False
@@ -507,7 +511,7 @@ class MainWindow(QMainWindow):
         self._log_message(f"LUFS NORMALIZER v{VERSION}")
         self._log_message("=" * 50)
         self._log_message(f"Target: {self.target_spinner.text()} LUFS")
-        self._log_message(f"Peak Ceiling: {self.peak_entry.text()} dBTP")
+        self._log_message(f"Peak Ceiling: {self.peak_spinner.text()} dBTP")
         self._log_message("-" * 50)
 
         # Configure worker
@@ -515,7 +519,7 @@ class MainWindow(QMainWindow):
         self.worker.input_dir = self.input_entry.text()
         self.worker.output_dir = self.output_entry.text()
         self.worker.target_lufs = float(self.target_spinner.text())
-        self.worker.peak_ceiling = float(self.peak_entry.text())
+        self.worker.peak_ceiling = float(self.peak_spinner.text())
         self.worker.bit_depth = self.bit_depth_combo.currentData()
         self.worker.sample_rate = self.sample_rate_combo.currentData()
         self.worker.use_batch_folders = self.batch_folders_cb.isChecked()
@@ -666,7 +670,7 @@ class MainWindow(QMainWindow):
             'input_folder': self.input_entry.text(),
             'output_folder': self.output_entry.text(),
             'target_lufs': self._safe_float(self.target_spinner.text(), -23.0),
-            'peak_ceiling': self._safe_float(self.peak_entry.text(), -1.0),
+            'peak_ceiling': self._safe_float(self.peak_spinner.text(), -1.0),
             'preset_name': self.selected_preset or '',
             'favorite_presets': self.favorite_presets,
             'strict_lufs_matching': self.strict_lufs_cb.isChecked(),

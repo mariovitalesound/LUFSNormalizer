@@ -49,13 +49,13 @@ class SpinnerEntry(QWidget):
         self.up_btn = QPushButton("\u25b2")
         self.up_btn.setFixedSize(24, 16)
         self.up_btn.setStyleSheet("font-size: 8px; padding: 0;")
-        self.up_btn.clicked.connect(lambda: self._adjust(1.0))
+        self.up_btn.mousePressEvent = lambda e: self._adjust(0.1 if e.modifiers() & Qt.ShiftModifier else 1.0)
         btn_layout.addWidget(self.up_btn)
 
         self.down_btn = QPushButton("\u25bc")
         self.down_btn.setFixedSize(24, 16)
         self.down_btn.setStyleSheet("font-size: 8px; padding: 0;")
-        self.down_btn.clicked.connect(lambda: self._adjust(-1.0))
+        self.down_btn.mousePressEvent = lambda e: self._adjust(-0.1 if e.modifiers() & Qt.ShiftModifier else -1.0)
         btn_layout.addWidget(self.down_btn)
 
         layout.addLayout(btn_layout)

@@ -2,7 +2,7 @@
 
 Professional batch audio normalization for broadcast, game audio, and streaming. Normalizes WAV and AIFF files to industry-standard LUFS targets while respecting True Peak limits.
 
-**Version 3.0.2** | Author: Mario Vitale
+**Version 3.0.3** | Author: Mario Vitale
 
 ## Features
 
@@ -137,7 +137,7 @@ When enabled (`--bwf` on CLI, or the "Embed BWF metadata" checkbox in the GUI), 
 
 | Field | Value |
 |---|---|
-| Description | `Normalized to -23.0 LUFS by LUFS Normalizer v3.0.2` |
+| Description | `Normalized to -23.0 LUFS by LUFS Normalizer v3.0.3` |
 | Originator | `LUFS Normalizer` |
 | OriginatorReference | `LN302` |
 | OriginationDate | Processing date (yyyy-mm-dd) |
@@ -152,7 +152,7 @@ When enabled (`--bwf` on CLI, or the "Embed BWF metadata" checkbox in the GUI), 
 <BWFXML>
   <IXML_VERSION>1.52</IXML_VERSION>
   <PROJECT>LUFS Normalizer</PROJECT>
-  <NOTE>Normalized to -23.0 LUFS by LUFS Normalizer v3.0.2</NOTE>
+  <NOTE>Normalized to -23.0 LUFS by LUFS Normalizer v3.0.3</NOTE>
   <USER>
     <TARGET_LUFS>-23.0</TARGET_LUFS>
     <FINAL_LUFS>-23.01</FINAL_LUFS>
@@ -253,13 +253,13 @@ New `.wav` and `.aiff` files dropped into the watch folder are automatically det
 build.bat
 ```
 
-This installs build dependencies, generates the application icon via `create_icon.py`, and runs PyInstaller to produce a single-file exe. The distribution is written to `dist/LUFSNormalizer_v3.0.2/` with the exe, `config.json`, and icon files.
+This installs build dependencies, generates the application icon via `create_icon.py`, and runs PyInstaller to produce a single-file exe. The distribution is written to `dist/LUFSNormalizer_v3.0.3/` with the exe, `config.json`, and icon files.
 
 ### Manual build
 
 ```bash
 pip install pyinstaller
-pyinstaller LUFSNormalizer_v3.0.2.spec
+pyinstaller LUFSNormalizer_v3.0.3.spec
 ```
 
 The spec file bundles `config.json`, the `lufs_normalizer` package, and hidden imports for PySide6, soundfile, pyloudnorm, soxr, numpy, and watchdog.

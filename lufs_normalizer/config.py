@@ -25,7 +25,7 @@ DEFAULT_CONFIG = {
     'generate_csv': True,
     # v3.0 new fields
     'embed_bwf': False,
-    'parallel_processing': True,
+    'parallel_processing': False,
     'parallel_workers': 0,  # 0 = auto (CPU count)
     'watch_input_folder': '',
     'watch_output_folder': '',
@@ -42,9 +42,16 @@ def load_config(config_path):
     config = dict(DEFAULT_CONFIG)
     config_file = Path(config_path)
 
-    if config_file.exists():
+    # Try user config first, then bundled default
+    load_path = config_file
+    if not load_path.exists():
+        default_path = config_file.parent / 'config.default.json'
+        if default_path.exists():
+            load_path = default_path
+
+    if load_path.exists():
         try:
-            with open(config_file, 'r') as f:
+            with open(load_path, 'r') as f:
                 user_config = json.load(f)
 
             # v2 -> v3 migration
@@ -83,7 +90,7 @@ def _migrate_v2_to_v3(user_config):
 
     # Add v3 defaults for new fields
     user_config.setdefault('embed_bwf', False)
-    user_config.setdefault('parallel_processing', True)
+    user_config.setdefault('parallel_processing', False)
     user_config.setdefault('parallel_workers', 0)
     user_config.setdefault('watch_input_folder', '')
     user_config.setdefault('watch_output_folder', '')

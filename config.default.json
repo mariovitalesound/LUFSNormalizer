@@ -1,8 +1,8 @@
 {
-    "input_folder": "I:/AudioWork/input_audio",
-    "output_folder": "J:/Audio_Exports",
+    "input_folder": "",
+    "output_folder": "",
     "target_lufs": -24.0,
-    "peak_ceiling": -1.0,
+    "peak_ceiling": -2.0,
     "preset_name": "broadcast_us",
     "favorite_presets": [
         "broadcast_us",
@@ -17,7 +17,7 @@
     "generate_log": true,
     "generate_csv": true,
     "embed_bwf": false,
-    "parallel_processing": true,
+    "parallel_processing": false,
     "parallel_workers": 0,
     "watch_input_folder": "",
     "watch_output_folder": "",

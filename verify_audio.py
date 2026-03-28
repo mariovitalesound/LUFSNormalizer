@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LUFS & True Peak Verification Tool v3.0.2
+LUFS & True Peak Verification Tool v3.0.3
 Verify normalized files meet broadcast specifications
 
 Uses SOXR for True Peak measurement (same as normalizer)
