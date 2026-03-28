@@ -38,8 +38,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"LUFS Normalizer v{VERSION}")
-        self.setMinimumSize(750, 950)
-        self.resize(760, 980)
+        self.setMinimumSize(760, 900)
+        self.resize(780, 1000)
 
         # Paths
         if getattr(sys, 'frozen', False):
