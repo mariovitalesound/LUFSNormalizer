@@ -236,22 +236,26 @@ class MainWindow(QMainWindow):
         mode_label.setFont(QFont("", 11, QFont.Bold))
         mode_layout.addWidget(mode_label)
 
+        strict_row = QHBoxLayout()
         self.strict_radio = QRadioButton("Strict")
         self.strict_radio.setStyleSheet("font-weight: bold;")
+        self.strict_radio.setFixedWidth(80)
         self.strict_radio.toggled.connect(self._on_peak_mode_changed)
-        mode_layout.addWidget(self.strict_radio)
+        strict_row.addWidget(self.strict_radio)
+        strict_desc = QLabel("Files exceeding peak ceiling are skipped → needs_limiting/")
+        strict_desc.setStyleSheet("font-size: 10px; color: gray;")
+        strict_row.addWidget(strict_desc, 1)
+        mode_layout.addLayout(strict_row)
 
-        strict_desc = QLabel("Files exceeding peak ceiling are skipped and copied to needs_limiting/")
-        strict_desc.setStyleSheet("font-size: 10px; color: gray; margin-left: 20px;")
-        mode_layout.addWidget(strict_desc)
-
+        drift_row = QHBoxLayout()
         self.drift_radio = QRadioButton("Drift")
         self.drift_radio.setStyleSheet("font-weight: bold;")
-        mode_layout.addWidget(self.drift_radio)
-
-        drift_desc = QLabel("Gain is reduced to protect peak ceiling — output LUFS may undershoot target")
-        drift_desc.setStyleSheet("font-size: 10px; color: gray; margin-left: 20px;")
-        mode_layout.addWidget(drift_desc)
+        self.drift_radio.setFixedWidth(80)
+        drift_row.addWidget(self.drift_radio)
+        drift_desc = QLabel("Gain reduced to protect peak — LUFS may undershoot target")
+        drift_desc.setStyleSheet("font-size: 10px; color: gray;")
+        drift_row.addWidget(drift_desc, 1)
+        mode_layout.addLayout(drift_row)
 
         layout.addWidget(self.peak_mode_frame)
 

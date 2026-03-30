@@ -74,6 +74,15 @@ LUFS_PRESETS = {
         'standard': 'Contemporary pop/EDM'
     },
 
+    # Streaming Dialog
+    'streaming_dialog': {
+        'lufs': -18.0,
+        'peak': -1.0,
+        'name': 'Streaming Dialog',
+        'description': 'AES TD1008.1.23-9 — Podcast and streaming spoken word',
+        'standard': 'AES'
+    },
+
     # Reference
     'reference_cinema': {
         'lufs': -27.0,
