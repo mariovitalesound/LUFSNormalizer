@@ -244,11 +244,12 @@ class MainWindow(QMainWindow):
 
         mode_label = QLabel("Peak Handling Mode")
         mode_label.setFont(QFont("", 11, QFont.Bold))
+        mode_label.setStyleSheet("border: none;")
         mode_layout.addWidget(mode_label)
 
         strict_row = QHBoxLayout()
         self.strict_radio = QRadioButton("Strict")
-        self.strict_radio.setStyleSheet("font-weight: bold;")
+        self.strict_radio.setStyleSheet("font-weight: bold; border: none;")
         self.strict_radio.setFixedWidth(80)
         self.strict_radio.toggled.connect(self._on_peak_mode_changed)
         strict_row.addWidget(self.strict_radio)
@@ -259,7 +260,7 @@ class MainWindow(QMainWindow):
 
         drift_row = QHBoxLayout()
         self.drift_radio = QRadioButton("Drift")
-        self.drift_radio.setStyleSheet("font-weight: bold;")
+        self.drift_radio.setStyleSheet("font-weight: bold; border: none;")
         self.drift_radio.setFixedWidth(80)
         drift_row.addWidget(self.drift_radio)
         drift_desc = QLabel("Gain reduced to protect peak — LUFS may undershoot target")
