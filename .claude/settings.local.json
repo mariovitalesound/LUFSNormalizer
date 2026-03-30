@@ -18,7 +18,20 @@
       "Bash(cmd.exe //c build.bat)",
       "Bash(cmd.exe //c \"cd /d C:\\\\Users\\\\mvita\\\\Documents\\\\claude-projects\\\\LUFSNormalizer && build.bat\")",
       "Bash(cmd.exe //c \"C:\\\\Users\\\\mvita\\\\Documents\\\\claude-projects\\\\LUFSNormalizer\\\\build.bat\")",
-      "Bash(pyinstaller:*)"
+      "Bash(pyinstaller:*)",
+      "Bash(cd:*)",
+      "Bash(mv RELEASE_NOTES_v2.4.1.txt RELEASE_NOTES_v2.4.2.txt RELEASE_NOTES_v2.4.3.txt RELEASE_NOTES_v2.5.0.txt _legacy/release_notes/)",
+      "Bash(mv LUFS_Normalizer.spec LUFSNormalizer_v2.4.2.spec _legacy/old_specs/)",
+      "Bash(mv handoff_summary.txt session_history.txt _legacy/)",
+      "Bash(mv \"Archived Versions\" _legacy/old_archives/v2_archives)",
+      "Bash(mv lufs_normalizer.zip _legacy/old_archives/)",
+      "Bash(mv create_icon.py generate_icons.py generate_test_files.py verify_audio.py scripts/)",
+      "Bash(mv normalize_lufs_core.py _legacy/)",
+      "Bash(mv lufs_icon.ico taskbar_icon.ico taskbar_icon.png icons/)",
+      "Bash(mv app_icon.ico icons/)",
+      "Bash(rm -f \"=3.0.0\" \"=6.6.0\")",
+      "Bash(rm -f LUFSNormalizer.code-workspace LUFSNormalizerV3.code-workspace)",
+      "Bash(rm -rf __pycache__)"
     ]
   }
 }

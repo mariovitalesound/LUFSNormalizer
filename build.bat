@@ -9,13 +9,13 @@ pip install --upgrade pyinstaller Pillow PySide6
 
 echo.
 echo Generating application icon...
-python create_icon.py
+python scripts\create_icon.py
 
 echo.
 echo Building executable...
 pyinstaller --onefile --windowed ^
     --name "LUFSNormalizer_v3.0.3" ^
-    --icon "app_icon.ico" ^
+    --icon "icons\app_icon.ico" ^
     --add-data "config.default.json;." ^
     --add-data "lufs_normalizer;lufs_normalizer" ^
     --hidden-import=PySide6.QtWidgets ^
@@ -40,9 +40,9 @@ if not exist "dist\LUFSNormalizer_v3.0.3" mkdir "dist\LUFSNormalizer_v3.0.3"
 
 move "dist\LUFSNormalizer_v3.0.3.exe" "dist\LUFSNormalizer_v3.0.3\"
 copy "config.default.json" "dist\LUFSNormalizer_v3.0.3\config.json"
-copy "verify_audio.py" "dist\LUFSNormalizer_v3.0.3\"
-if exist "app_icon.ico" copy "app_icon.ico" "dist\LUFSNormalizer_v3.0.3\"
-if exist "taskbar_icon.ico" copy "taskbar_icon.ico" "dist\LUFSNormalizer_v3.0.3\"
+copy "scripts\verify_audio.py" "dist\LUFSNormalizer_v3.0.3\"
+if exist "icons\app_icon.ico" copy "icons\app_icon.ico" "dist\LUFSNormalizer_v3.0.3\"
+if exist "icons\taskbar_icon.ico" copy "icons\taskbar_icon.ico" "dist\LUFSNormalizer_v3.0.3\"
 
 echo.
 echo ====================================================

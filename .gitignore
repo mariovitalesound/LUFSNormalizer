@@ -14,8 +14,10 @@ __pycache__/
 test_input/
 test_output/
 
+# Legacy / archived files
+_legacy/
+
 # Archives
-Archived Versions/
 *.zip
 *.7z
 
@@ -23,15 +25,8 @@ Archived Versions/
 *.code-workspace
 .vscode/
 
-# Dev-only scripts
-generate_test_files.py
-
 # Root config (user-specific settings)
 /config.json
-
-# Session / handoff files
-session_history.txt
-handoff_summary.txt
 
 # Pip artifacts
 =*

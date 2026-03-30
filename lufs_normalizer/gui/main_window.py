@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QFrame
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QIcon
+from PySide6.QtGui import QFont, QIcon, QGuiApplication
 
 from .. import VERSION
 from ..config import load_config, save_config
@@ -38,8 +38,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"LUFS Normalizer v{VERSION}")
-        self.setMinimumSize(760, 900)
-        self.resize(780, 1000)
+        self.setMinimumSize(760, 700)
 
         # Paths
         if getattr(sys, 'frozen', False):
@@ -70,6 +69,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._load_settings_to_ui()
         self._update_file_count()
+        self._fit_to_content()
 
     def _set_icon(self):
         for name in ('taskbar_icon.ico', 'app_icon.ico', 'taskbar_icon.png'):
@@ -104,7 +104,8 @@ class MainWindow(QMainWindow):
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
-        content = QWidget()
+        self._batch_content = QWidget()
+        content = self._batch_content
         layout = QVBoxLayout(content)
         layout.setContentsMargins(15, 10, 15, 10)
 
@@ -696,6 +697,26 @@ class MainWindow(QMainWindow):
             self.selected_preset = matching
 
     # ── Utilities ──
+
+    def _fit_to_content(self):
+        """Resize window to fit all content, capped by screen size."""
+        # Measure actual content height + tab bar + margins
+        content_h = self._batch_content.sizeHint().height()
+        tab_bar_h = self.tabs.tabBar().sizeHint().height()
+        chrome = 60  # title bar + frame borders
+        ideal_h = content_h + tab_bar_h + chrome
+        ideal_w = 780
+
+        screen = QGuiApplication.primaryScreen()
+        if screen:
+            available = screen.availableGeometry()
+            w = min(ideal_w, available.width() - 40)
+            h = min(ideal_h, available.height() - 40)
+            x = available.x() + (available.width() - w) // 2
+            y = available.y() + (available.height() - h) // 2
+            self.setGeometry(x, y, w, h)
+        else:
+            self.resize(ideal_w, ideal_h)
 
     def _open_folder(self, path):
         try:

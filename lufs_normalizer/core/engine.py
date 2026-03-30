@@ -63,13 +63,14 @@ class LUFSNormalizer:
                     files.append(f)
         return sorted(files)
 
-    def _setup_output_dirs(self, output_dir, target_lufs, use_batch_folders):
+    def _setup_output_dirs(self, output_dir, target_lufs, use_batch_folders, strict_lufs_matching=True):
         """Create output directory structure. Returns (batch_path, normalized_path, needs_limiting_path, logs_path)."""
         output_path = Path(output_dir)
 
         if use_batch_folders:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            batch_name = f"batch_{timestamp}_{int(target_lufs)}LUFS"
+            mode = 'strict' if strict_lufs_matching else 'drift'
+            batch_name = f"batch_{timestamp}_{int(target_lufs)}LUFS_{mode}"
             batch_path = output_path / batch_name
             normalized_path = batch_path / 'normalized'
             needs_limiting_path = batch_path / 'needs_limiting'
@@ -233,7 +234,7 @@ class LUFSNormalizer:
 
         total_files = len(audio_files)
         batch_path, normalized_path, needs_limiting_path, logs_path = \
-            self._setup_output_dirs(output_dir, target_lufs, use_batch_folders)
+            self._setup_output_dirs(output_dir, target_lufs, use_batch_folders, strict_lufs_matching)
         log_file = self._setup_logging(logs_path, generate_log)
 
         # Log header
@@ -313,7 +314,7 @@ class LUFSNormalizer:
             max_workers = os.cpu_count() or 4
 
         batch_path, normalized_path, needs_limiting_path, logs_path = \
-            self._setup_output_dirs(output_dir, target_lufs, use_batch_folders)
+            self._setup_output_dirs(output_dir, target_lufs, use_batch_folders, strict_lufs_matching)
         log_file = self._setup_logging(logs_path, generate_log)
 
         logger.info("=" * 70)
