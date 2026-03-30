@@ -108,6 +108,7 @@ class MainWindow(QMainWindow):
         content = self._batch_content
         layout = QVBoxLayout(content)
         layout.setContentsMargins(15, 10, 15, 10)
+        layout.setSpacing(6)
 
         # Title bar
         title_row = QHBoxLayout()
@@ -178,65 +179,64 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(presets_frame)
 
-        # Settings Section (LUFS + Peak)
+        # Settings Section (LUFS + Peak + Format)
         settings_frame = self._make_section_frame()
-        settings_layout = QHBoxLayout(settings_frame)
-        settings_layout.setAlignment(Qt.AlignCenter)
+        settings_outer = QVBoxLayout(settings_frame)
 
-        settings_layout.addWidget(QLabel("Target LUFS:"))
+        settings_row = QHBoxLayout()
+        settings_row.setAlignment(Qt.AlignCenter)
+
+        settings_row.addWidget(QLabel("Target LUFS:"))
         self.target_spinner = SpinnerEntry(str(self.config.get('target_lufs', -23.0)), width=70)
         self.target_spinner.valueChanged.connect(self._on_manual_entry)
-        settings_layout.addWidget(self.target_spinner)
+        settings_row.addWidget(self.target_spinner)
 
-        settings_layout.addSpacing(20)
+        settings_row.addSpacing(20)
 
-        settings_layout.addWidget(QLabel("Peak Ceiling:"))
+        settings_row.addWidget(QLabel("Peak Ceiling:"))
         self.peak_spinner = SpinnerEntry(str(self.config.get('peak_ceiling', -1.0)), width=70)
         self.peak_spinner.valueChanged.connect(self._on_manual_entry)
-        settings_layout.addWidget(self.peak_spinner)
+        settings_row.addWidget(self.peak_spinner)
 
         dbtp_label = QLabel("dBTP")
         dbtp_label.setStyleSheet("color: gray;")
-        settings_layout.addWidget(dbtp_label)
+        settings_row.addWidget(dbtp_label)
 
-        layout.addWidget(settings_frame)
+        settings_outer.addLayout(settings_row)
 
-        # Format Section
-        format_frame = self._make_section_frame()
-        format_layout = QHBoxLayout(format_frame)
-        format_layout.setAlignment(Qt.AlignCenter)
+        format_row = QHBoxLayout()
+        format_row.setAlignment(Qt.AlignCenter)
 
-        format_layout.addWidget(QLabel("Bit Depth:"))
+        combo_style = """
+            QComboBox { border: 1px solid #555555; border-radius: 4px; padding: 2px 8px; }
+            QComboBox::drop-down { width: 20px; border-left: 1px solid #555555; }
+        """
+
+        format_row.addWidget(QLabel("Bit Depth:"))
         self.bit_depth_combo = QComboBox()
         for label, value in [('Source (preserve)', 'preserve'), ('16', '16'), ('24', '24'), ('32', '32')]:
             self.bit_depth_combo.addItem(label, value)
         self.bit_depth_combo.setCurrentIndex(
             self.bit_depth_combo.findData(self.config.get('bit_depth', 'preserve')))
         self.bit_depth_combo.setFixedWidth(140)
-        self.bit_depth_combo.setStyleSheet("""
-            QComboBox { border: 1px solid #555555; border-radius: 4px; padding: 2px 8px; }
-            QComboBox::drop-down { width: 20px; border-left: 1px solid #555555; }
-            QComboBox::down-arrow { width: 10px; height: 10px; }
-        """)
-        format_layout.addWidget(self.bit_depth_combo)
+        self.bit_depth_combo.setStyleSheet(combo_style)
+        format_row.addWidget(self.bit_depth_combo)
 
-        format_layout.addSpacing(25)
+        format_row.addSpacing(25)
 
-        format_layout.addWidget(QLabel("Sample Rate:"))
+        format_row.addWidget(QLabel("Sample Rate:"))
         self.sample_rate_combo = QComboBox()
         for label, value in [('Source (preserve)', 'preserve'), ('44100 Hz', '44100 Hz'), ('48000 Hz', '48000 Hz')]:
             self.sample_rate_combo.addItem(label, value)
         self.sample_rate_combo.setCurrentIndex(
             self.sample_rate_combo.findData(self.config.get('sample_rate', 'preserve')))
         self.sample_rate_combo.setFixedWidth(150)
-        self.sample_rate_combo.setStyleSheet("""
-            QComboBox { border: 1px solid #555555; border-radius: 4px; padding: 2px 8px; }
-            QComboBox::drop-down { width: 20px; border-left: 1px solid #555555; }
-            QComboBox::down-arrow { width: 10px; height: 10px; }
-        """)
-        format_layout.addWidget(self.sample_rate_combo)
+        self.sample_rate_combo.setStyleSheet(combo_style)
+        format_row.addWidget(self.sample_rate_combo)
 
-        layout.addWidget(format_frame)
+        settings_outer.addLayout(format_row)
+
+        layout.addWidget(settings_frame)
 
         # Peak Handling Mode Section
         self.peak_mode_frame = self._make_section_frame()
@@ -272,32 +272,30 @@ class MainWindow(QMainWindow):
 
         # Options Section
         options_frame = self._make_section_frame()
-        options_layout = QVBoxLayout(options_frame)
+        options_grid = QGridLayout(options_frame)
 
-        self.batch_folders_cb = QCheckBox("Organize output in timestamped batch folders")
+        self.batch_folders_cb = QCheckBox("Batch folders")
         self.batch_folders_cb.setChecked(self.config.get('use_batch_folders', True))
-        options_layout.addWidget(self.batch_folders_cb)
+        options_grid.addWidget(self.batch_folders_cb, 0, 0)
 
-        self.auto_open_cb = QCheckBox("Auto-open output folder when complete")
+        self.auto_open_cb = QCheckBox("Auto-open output")
         self.auto_open_cb.setChecked(self.config.get('auto_open_output', True))
-        options_layout.addWidget(self.auto_open_cb)
+        options_grid.addWidget(self.auto_open_cb, 0, 1)
 
-        log_csv_row = QHBoxLayout()
-        self.generate_log_cb = QCheckBox("Generate processing log")
+        self.generate_log_cb = QCheckBox("Processing log")
         self.generate_log_cb.setChecked(self.config.get('generate_log', True))
-        log_csv_row.addWidget(self.generate_log_cb)
-        self.generate_csv_cb = QCheckBox("Generate CSV report")
-        self.generate_csv_cb.setChecked(self.config.get('generate_csv', True))
-        log_csv_row.addWidget(self.generate_csv_cb)
-        log_csv_row.addStretch()
-        options_layout.addLayout(log_csv_row)
+        options_grid.addWidget(self.generate_log_cb, 1, 0)
 
-        self.embed_bwf_cb = QCheckBox("Embed BWF metadata (BEXT + iXML)")
+        self.generate_csv_cb = QCheckBox("CSV report")
+        self.generate_csv_cb.setChecked(self.config.get('generate_csv', True))
+        options_grid.addWidget(self.generate_csv_cb, 1, 1)
+
+        self.embed_bwf_cb = QCheckBox("BWF metadata (BEXT + iXML)")
         self.embed_bwf_cb.setChecked(self.config.get('embed_bwf', False))
-        options_layout.addWidget(self.embed_bwf_cb)
+        options_grid.addWidget(self.embed_bwf_cb, 2, 0)
 
         parallel_row = QHBoxLayout()
-        self.parallel_cb = QCheckBox("Parallel processing")
+        self.parallel_cb = QCheckBox("Parallel")
         self.parallel_cb.setChecked(self.config.get('parallel_processing', False))
         parallel_row.addWidget(self.parallel_cb)
         parallel_row.addWidget(QLabel("Workers:"))
@@ -311,7 +309,7 @@ class MainWindow(QMainWindow):
         self.workers_combo.setFixedWidth(70)
         parallel_row.addWidget(self.workers_combo)
         parallel_row.addStretch()
-        options_layout.addLayout(parallel_row)
+        options_grid.addLayout(parallel_row, 2, 1)
 
         layout.addWidget(options_frame)
 
@@ -396,7 +394,7 @@ class MainWindow(QMainWindow):
             QFrame {
                 background-color: #2b2b2b;
                 border-radius: 8px;
-                padding: 12px;
+                padding: 8px;
                 margin-bottom: 4px;
             }
         """)
@@ -688,7 +686,7 @@ class MainWindow(QMainWindow):
                 background-color: #2b2b2b;
                 border: 2px solid {color};
                 border-radius: 8px;
-                padding: 12px;
+                padding: 8px;
                 margin-bottom: 4px;
             }}
         """)
