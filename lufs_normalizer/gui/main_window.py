@@ -207,11 +207,6 @@ class MainWindow(QMainWindow):
         format_row = QHBoxLayout()
         format_row.setAlignment(Qt.AlignCenter)
 
-        combo_style = """
-            QComboBox { border: 1px solid #555555; border-radius: 4px; padding: 2px 8px; }
-            QComboBox::drop-down { width: 20px; border-left: 1px solid #555555; }
-        """
-
         format_row.addWidget(QLabel("Bit Depth:"))
         self.bit_depth_combo = QComboBox()
         for label, value in [('Source (preserve)', 'preserve'), ('16', '16'), ('24', '24'), ('32', '32')]:
@@ -219,7 +214,6 @@ class MainWindow(QMainWindow):
         self.bit_depth_combo.setCurrentIndex(
             self.bit_depth_combo.findData(self.config.get('bit_depth', 'preserve')))
         self.bit_depth_combo.setFixedWidth(140)
-        self.bit_depth_combo.setStyleSheet(combo_style)
         format_row.addWidget(self.bit_depth_combo)
 
         format_row.addSpacing(25)
@@ -231,7 +225,6 @@ class MainWindow(QMainWindow):
         self.sample_rate_combo.setCurrentIndex(
             self.sample_rate_combo.findData(self.config.get('sample_rate', 'preserve')))
         self.sample_rate_combo.setFixedWidth(150)
-        self.sample_rate_combo.setStyleSheet(combo_style)
         format_row.addWidget(self.sample_rate_combo)
 
         settings_outer.addLayout(format_row)
@@ -272,7 +265,13 @@ class MainWindow(QMainWindow):
 
         # Options Section
         options_frame = self._make_section_frame()
-        options_grid = QGridLayout(options_frame)
+        options_outer = QVBoxLayout(options_frame)
+
+        options_grid = QGridLayout()
+        options_grid.setColumnStretch(0, 1)
+        options_grid.setColumnStretch(1, 1)
+        options_grid.setColumnMinimumWidth(0, 200)
+        options_grid.setColumnMinimumWidth(1, 200)
 
         self.batch_folders_cb = QCheckBox("Batch folders")
         self.batch_folders_cb.setChecked(self.config.get('use_batch_folders', True))
@@ -294,11 +293,15 @@ class MainWindow(QMainWindow):
         self.embed_bwf_cb.setChecked(self.config.get('embed_bwf', False))
         options_grid.addWidget(self.embed_bwf_cb, 2, 0)
 
-        parallel_row = QHBoxLayout()
         self.parallel_cb = QCheckBox("Parallel")
         self.parallel_cb.setChecked(self.config.get('parallel_processing', False))
-        parallel_row.addWidget(self.parallel_cb)
-        parallel_row.addWidget(QLabel("Workers:"))
+        options_grid.addWidget(self.parallel_cb, 2, 1)
+
+        options_outer.addLayout(options_grid)
+
+        workers_row = QHBoxLayout()
+        workers_row.addStretch()
+        workers_row.addWidget(QLabel("Workers:"))
         self.workers_combo = QComboBox()
         self.workers_combo.addItems(['Auto'] + [str(i) for i in range(1, (os.cpu_count() or 4) + 1)])
         workers_val = self.config.get('parallel_workers', 0)
@@ -307,9 +310,8 @@ class MainWindow(QMainWindow):
         else:
             self.workers_combo.setCurrentText(str(workers_val))
         self.workers_combo.setFixedWidth(70)
-        parallel_row.addWidget(self.workers_combo)
-        parallel_row.addStretch()
-        options_grid.addLayout(parallel_row, 2, 1)
+        workers_row.addWidget(self.workers_combo)
+        options_outer.addLayout(workers_row)
 
         layout.addWidget(options_frame)
 
