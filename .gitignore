@@ -2,7 +2,7 @@
 dist/
 build/
 *.spec
-!LUFSNormalizer_v3.0.3.spec
+!LUFSNormalizer_v3.0.4.spec
 
 # Python
 __pycache__/
