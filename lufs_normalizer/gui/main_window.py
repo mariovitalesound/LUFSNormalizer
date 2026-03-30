@@ -208,22 +208,32 @@ class MainWindow(QMainWindow):
 
         format_layout.addWidget(QLabel("Bit Depth:"))
         self.bit_depth_combo = QComboBox()
-        for label, value in [('Source', 'preserve'), ('16', '16'), ('24', '24'), ('32', '32')]:
+        for label, value in [('Source (preserve)', 'preserve'), ('16', '16'), ('24', '24'), ('32', '32')]:
             self.bit_depth_combo.addItem(label, value)
         self.bit_depth_combo.setCurrentIndex(
             self.bit_depth_combo.findData(self.config.get('bit_depth', 'preserve')))
-        self.bit_depth_combo.setFixedWidth(100)
+        self.bit_depth_combo.setFixedWidth(140)
+        self.bit_depth_combo.setStyleSheet("""
+            QComboBox { border: 1px solid #555555; border-radius: 4px; padding: 2px 8px; }
+            QComboBox::drop-down { width: 20px; }
+            QComboBox::down-arrow { image: none; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid #cccccc; width: 0; height: 0; }
+        """)
         format_layout.addWidget(self.bit_depth_combo)
 
         format_layout.addSpacing(25)
 
         format_layout.addWidget(QLabel("Sample Rate:"))
         self.sample_rate_combo = QComboBox()
-        for label, value in [('Source', 'preserve'), ('44100 Hz', '44100 Hz'), ('48000 Hz', '48000 Hz')]:
+        for label, value in [('Source (preserve)', 'preserve'), ('44100 Hz', '44100 Hz'), ('48000 Hz', '48000 Hz')]:
             self.sample_rate_combo.addItem(label, value)
         self.sample_rate_combo.setCurrentIndex(
             self.sample_rate_combo.findData(self.config.get('sample_rate', 'preserve')))
-        self.sample_rate_combo.setFixedWidth(110)
+        self.sample_rate_combo.setFixedWidth(150)
+        self.sample_rate_combo.setStyleSheet("""
+            QComboBox { border: 1px solid #555555; border-radius: 4px; padding: 2px 8px; }
+            QComboBox::drop-down { width: 20px; }
+            QComboBox::down-arrow { image: none; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid #cccccc; width: 0; height: 0; }
+        """)
         format_layout.addWidget(self.sample_rate_combo)
 
         layout.addWidget(format_frame)
@@ -243,7 +253,7 @@ class MainWindow(QMainWindow):
         self.strict_radio.toggled.connect(self._on_peak_mode_changed)
         strict_row.addWidget(self.strict_radio)
         strict_desc = QLabel("Files exceeding peak ceiling are skipped → needs_limiting/")
-        strict_desc.setStyleSheet("font-size: 10px; color: gray;")
+        strict_desc.setStyleSheet("font-size: 10px; color: gray; border: none;")
         strict_row.addWidget(strict_desc, 1)
         mode_layout.addLayout(strict_row)
 
@@ -253,7 +263,7 @@ class MainWindow(QMainWindow):
         self.drift_radio.setFixedWidth(80)
         drift_row.addWidget(self.drift_radio)
         drift_desc = QLabel("Gain reduced to protect peak — LUFS may undershoot target")
-        drift_desc.setStyleSheet("font-size: 10px; color: gray;")
+        drift_desc.setStyleSheet("font-size: 10px; color: gray; border: none;")
         drift_row.addWidget(drift_desc, 1)
         mode_layout.addLayout(drift_row)
 
