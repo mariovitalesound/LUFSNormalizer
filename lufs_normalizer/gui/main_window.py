@@ -214,6 +214,11 @@ class MainWindow(QMainWindow):
         self.bit_depth_combo.setCurrentIndex(
             self.bit_depth_combo.findData(self.config.get('bit_depth', 'preserve')))
         self.bit_depth_combo.setFixedWidth(140)
+        self.bit_depth_combo.setStyleSheet("""
+            QComboBox { padding-right: 20px; }
+            QComboBox::drop-down { subcontrol-origin: padding; subcontrol-position: top right; width: 20px; }
+            QComboBox::down-arrow { width: 8px; height: 8px; border: 2px solid #cccccc; border-top: none; border-left: none; transform: rotate(45deg); }
+        """)
         format_row.addWidget(self.bit_depth_combo)
 
         format_row.addSpacing(25)
@@ -225,6 +230,11 @@ class MainWindow(QMainWindow):
         self.sample_rate_combo.setCurrentIndex(
             self.sample_rate_combo.findData(self.config.get('sample_rate', 'preserve')))
         self.sample_rate_combo.setFixedWidth(150)
+        self.sample_rate_combo.setStyleSheet("""
+            QComboBox { padding-right: 20px; }
+            QComboBox::drop-down { subcontrol-origin: padding; subcontrol-position: top right; width: 20px; }
+            QComboBox::down-arrow { width: 8px; height: 8px; border: 2px solid #cccccc; border-top: none; border-left: none; transform: rotate(45deg); }
+        """)
         format_row.addWidget(self.sample_rate_combo)
 
         settings_outer.addLayout(format_row)
@@ -293,15 +303,14 @@ class MainWindow(QMainWindow):
         self.embed_bwf_cb.setChecked(self.config.get('embed_bwf', False))
         options_grid.addWidget(self.embed_bwf_cb, 2, 0)
 
-        self.parallel_cb = QCheckBox("Parallel")
-        self.parallel_cb.setChecked(self.config.get('parallel_processing', False))
-        options_grid.addWidget(self.parallel_cb, 2, 1)
-
         options_outer.addLayout(options_grid)
 
-        workers_row = QHBoxLayout()
-        workers_row.addStretch()
-        workers_row.addWidget(QLabel("Workers:"))
+        parallel_row = QHBoxLayout()
+        self.parallel_cb = QCheckBox("Parallel")
+        self.parallel_cb.setChecked(self.config.get('parallel_processing', False))
+        parallel_row.addWidget(self.parallel_cb)
+        parallel_row.addSpacing(8)
+        parallel_row.addWidget(QLabel("Workers:"))
         self.workers_combo = QComboBox()
         self.workers_combo.addItems(['Auto'] + [str(i) for i in range(1, (os.cpu_count() or 4) + 1)])
         workers_val = self.config.get('parallel_workers', 0)
@@ -310,8 +319,9 @@ class MainWindow(QMainWindow):
         else:
             self.workers_combo.setCurrentText(str(workers_val))
         self.workers_combo.setFixedWidth(70)
-        workers_row.addWidget(self.workers_combo)
-        options_outer.addLayout(workers_row)
+        parallel_row.addWidget(self.workers_combo)
+        parallel_row.addStretch()
+        options_outer.addLayout(parallel_row)
 
         layout.addWidget(options_frame)
 
