@@ -11,7 +11,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QLineEdit, QPushButton, QCheckBox, QComboBox,
+    QLabel, QLineEdit, QPushButton, QCheckBox, QComboBox, QRadioButton,
     QProgressBar, QFileDialog, QMessageBox, QTabWidget, QScrollArea,
     QFrame
 )
@@ -228,6 +228,33 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(format_frame)
 
+        # Peak Handling Mode Section
+        self.peak_mode_frame = self._make_section_frame()
+        mode_layout = QVBoxLayout(self.peak_mode_frame)
+
+        mode_label = QLabel("Peak Handling Mode")
+        mode_label.setFont(QFont("", 11, QFont.Bold))
+        mode_layout.addWidget(mode_label)
+
+        self.strict_radio = QRadioButton("Strict")
+        self.strict_radio.setStyleSheet("font-weight: bold;")
+        self.strict_radio.toggled.connect(self._on_peak_mode_changed)
+        mode_layout.addWidget(self.strict_radio)
+
+        strict_desc = QLabel("Files exceeding peak ceiling are skipped and copied to needs_limiting/")
+        strict_desc.setStyleSheet("font-size: 10px; color: gray; margin-left: 20px;")
+        mode_layout.addWidget(strict_desc)
+
+        self.drift_radio = QRadioButton("Drift")
+        self.drift_radio.setStyleSheet("font-weight: bold;")
+        mode_layout.addWidget(self.drift_radio)
+
+        drift_desc = QLabel("Gain is reduced to protect peak ceiling — output LUFS may undershoot target")
+        drift_desc.setStyleSheet("font-size: 10px; color: gray; margin-left: 20px;")
+        mode_layout.addWidget(drift_desc)
+
+        layout.addWidget(self.peak_mode_frame)
+
         # Options Section
         options_frame = self._make_section_frame()
         options_layout = QVBoxLayout(options_frame)
@@ -254,27 +281,9 @@ class MainWindow(QMainWindow):
         self.embed_bwf_cb.setChecked(self.config.get('embed_bwf', False))
         options_layout.addWidget(self.embed_bwf_cb)
 
-        strict_row = QHBoxLayout()
-        self.strict_lufs_cb = QCheckBox("Strict LUFS matching")
-        self.strict_lufs_cb.setChecked(self.config.get('strict_lufs_matching', True))
-        strict_row.addWidget(self.strict_lufs_cb)
-        strict_help = QPushButton("?")
-        strict_help.setFixedSize(20, 20)
-        strict_help.setStyleSheet("""
-            QPushButton {
-                background-color: #555555; color: white; font-size: 12px;
-                font-weight: bold; border-radius: 10px; padding: 0;
-            }
-            QPushButton:hover { background-color: #777777; }
-        """)
-        strict_help.clicked.connect(self._show_strict_help)
-        strict_row.addWidget(strict_help)
-        strict_row.addStretch()
-        options_layout.addLayout(strict_row)
-
         parallel_row = QHBoxLayout()
         self.parallel_cb = QCheckBox("Parallel processing")
-        self.parallel_cb.setChecked(self.config.get('parallel_processing', True))
+        self.parallel_cb.setChecked(self.config.get('parallel_processing', False))
         parallel_row.addWidget(self.parallel_cb)
         parallel_row.addWidget(QLabel("Workers:"))
         self.workers_combo = QComboBox()
@@ -296,10 +305,15 @@ class MainWindow(QMainWindow):
         process_layout = QVBoxLayout(process_frame)
         process_layout.setAlignment(Qt.AlignCenter)
 
+        file_info_row = QHBoxLayout()
+        file_info_row.setAlignment(Qt.AlignCenter)
         self.file_count_label = QLabel("0 files found")
-        self.file_count_label.setAlignment(Qt.AlignCenter)
         self.file_count_label.setStyleSheet("font-size: 11px;")
-        process_layout.addWidget(self.file_count_label)
+        file_info_row.addWidget(self.file_count_label)
+        file_info_row.addSpacing(8)
+        self.mode_badge = QLabel("STRICT")
+        file_info_row.addWidget(self.mode_badge)
+        process_layout.addLayout(file_info_row)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setFixedWidth(450)
@@ -526,7 +540,7 @@ class MainWindow(QMainWindow):
         self.worker.use_batch_folders = self.batch_folders_cb.isChecked()
         self.worker.generate_log = self.generate_log_cb.isChecked()
         self.worker.generate_csv = self.generate_csv_cb.isChecked()
-        self.worker.strict_lufs_matching = self.strict_lufs_cb.isChecked()
+        self.worker.strict_lufs_matching = self.strict_radio.isChecked()
         self.worker.embed_bwf = self.embed_bwf_cb.isChecked()
         self.worker.parallel = self.parallel_cb.isChecked()
 
@@ -651,12 +665,38 @@ class MainWindow(QMainWindow):
         dlg = AboutDialog(self)
         dlg.exec()
 
-    def _show_strict_help(self):
-        QMessageBox.information(
-            self, "Strict Mode Info",
-            "Strict LUFS: Files exceeding peak are skipped.\n\n"
-            "Drift Mode: Gain reduced to protect peak (quieter result)."
-        )
+    def _on_peak_mode_changed(self):
+        is_strict = self.strict_radio.isChecked()
+        if is_strict:
+            self.peak_mode_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #2b2b2b;
+                    border-radius: 8px;
+                    padding: 12px;
+                    margin-bottom: 4px;
+                    border-left: 4px solid #f0a500;
+                }
+            """)
+            self.mode_badge.setText("STRICT")
+            self.mode_badge.setStyleSheet(
+                "background-color: #f0a500; color: black; font-weight: bold; "
+                "font-size: 10px; padding: 2px 6px; border-radius: 3px;"
+            )
+        else:
+            self.peak_mode_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #2b2b2b;
+                    border-radius: 8px;
+                    padding: 12px;
+                    margin-bottom: 4px;
+                    border-left: 4px solid #4a9eff;
+                }
+            """)
+            self.mode_badge.setText("DRIFT")
+            self.mode_badge.setStyleSheet(
+                "background-color: #4a9eff; color: black; font-weight: bold; "
+                "font-size: 10px; padding: 2px 6px; border-radius: 3px;"
+            )
 
     # ── Config ──
 
@@ -674,7 +714,7 @@ class MainWindow(QMainWindow):
             'peak_ceiling': self._safe_float(self.peak_spinner.text(), -1.0),
             'preset_name': self.selected_preset or '',
             'favorite_presets': self.favorite_presets,
-            'strict_lufs_matching': self.strict_lufs_cb.isChecked(),
+            'strict_lufs_matching': self.strict_radio.isChecked(),
             'auto_open_output': self.auto_open_cb.isChecked(),
             'bit_depth': self.bit_depth_combo.currentData(),
             'sample_rate': self.sample_rate_combo.currentData(),
@@ -691,6 +731,12 @@ class MainWindow(QMainWindow):
         save_config(self.config, self.config_file)
 
     def _load_settings_to_ui(self):
+        if self.config.get('strict_lufs_matching', True):
+            self.strict_radio.setChecked(True)
+        else:
+            self.drift_radio.setChecked(True)
+        self._on_peak_mode_changed()
+
         matching = get_preset_for_lufs(self.target_spinner.text())
         if matching:
             self._update_preset_highlights(matching)
