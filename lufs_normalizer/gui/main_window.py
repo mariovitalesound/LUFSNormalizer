@@ -681,36 +681,24 @@ class MainWindow(QMainWindow):
 
     def _on_peak_mode_changed(self):
         is_strict = self.strict_radio.isChecked()
+        color = "#f0a500" if is_strict else "#4a9eff"
+        self.peak_mode_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: #2b2b2b;
+                border: 2px solid {color};
+                border-radius: 8px;
+                padding: 12px;
+                margin-bottom: 4px;
+            }}
+        """)
         if is_strict:
-            self.peak_mode_frame.setStyleSheet("""
-                QFrame {
-                    background-color: #2b2b2b;
-                    border-radius: 8px;
-                    padding: 12px;
-                    margin-bottom: 4px;
-                    border-left: 4px solid #f0a500;
-                }
-            """)
             self.mode_badge.setText("STRICT")
-            self.mode_badge.setStyleSheet(
-                "background-color: #f0a500; color: black; font-weight: bold; "
-                "font-size: 10px; padding: 2px 6px; border-radius: 3px;"
-            )
         else:
-            self.peak_mode_frame.setStyleSheet("""
-                QFrame {
-                    background-color: #2b2b2b;
-                    border-radius: 8px;
-                    padding: 12px;
-                    margin-bottom: 4px;
-                    border-left: 4px solid #4a9eff;
-                }
-            """)
             self.mode_badge.setText("DRIFT")
-            self.mode_badge.setStyleSheet(
-                "background-color: #4a9eff; color: black; font-weight: bold; "
-                "font-size: 10px; padding: 2px 6px; border-radius: 3px;"
-            )
+        self.mode_badge.setStyleSheet(
+            f"background-color: {color}; color: black; font-weight: bold; "
+            "font-size: 10px; padding: 2px 6px; border-radius: 3px;"
+        )
 
     # ── Config ──
 
