@@ -215,8 +215,8 @@ class MainWindow(QMainWindow):
         self.bit_depth_combo.setFixedWidth(140)
         self.bit_depth_combo.setStyleSheet("""
             QComboBox { border: 1px solid #555555; border-radius: 4px; padding: 2px 8px; }
-            QComboBox::drop-down { width: 20px; }
-            QComboBox::down-arrow { image: none; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid #cccccc; width: 0; height: 0; }
+            QComboBox::drop-down { width: 20px; border-left: 1px solid #555555; }
+            QComboBox::down-arrow { width: 10px; height: 10px; }
         """)
         format_layout.addWidget(self.bit_depth_combo)
 
@@ -231,8 +231,8 @@ class MainWindow(QMainWindow):
         self.sample_rate_combo.setFixedWidth(150)
         self.sample_rate_combo.setStyleSheet("""
             QComboBox { border: 1px solid #555555; border-radius: 4px; padding: 2px 8px; }
-            QComboBox::drop-down { width: 20px; }
-            QComboBox::down-arrow { image: none; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid #cccccc; width: 0; height: 0; }
+            QComboBox::drop-down { width: 20px; border-left: 1px solid #555555; }
+            QComboBox::down-arrow { width: 10px; height: 10px; }
         """)
         format_layout.addWidget(self.sample_rate_combo)
 
