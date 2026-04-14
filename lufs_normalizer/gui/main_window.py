@@ -213,12 +213,8 @@ class MainWindow(QMainWindow):
             self.bit_depth_combo.addItem(label, value)
         self.bit_depth_combo.setCurrentIndex(
             self.bit_depth_combo.findData(self.config.get('bit_depth', 'preserve')))
-        self.bit_depth_combo.setFixedWidth(140)
-        self.bit_depth_combo.setStyleSheet("""
-            QComboBox { padding-right: 20px; }
-            QComboBox::drop-down { subcontrol-origin: padding; subcontrol-position: top right; width: 20px; }
-            QComboBox::down-arrow { width: 8px; height: 8px; border: 2px solid #cccccc; border-top: none; border-left: none; transform: rotate(45deg); }
-        """)
+        self.bit_depth_combo.setFixedWidth(160)
+        self.bit_depth_combo.setStyleSheet("QComboBox { padding-right: 20px; }")
         format_row.addWidget(self.bit_depth_combo)
 
         format_row.addSpacing(25)
@@ -229,12 +225,8 @@ class MainWindow(QMainWindow):
             self.sample_rate_combo.addItem(label, value)
         self.sample_rate_combo.setCurrentIndex(
             self.sample_rate_combo.findData(self.config.get('sample_rate', 'preserve')))
-        self.sample_rate_combo.setFixedWidth(150)
-        self.sample_rate_combo.setStyleSheet("""
-            QComboBox { padding-right: 20px; }
-            QComboBox::drop-down { subcontrol-origin: padding; subcontrol-position: top right; width: 20px; }
-            QComboBox::down-arrow { width: 8px; height: 8px; border: 2px solid #cccccc; border-top: none; border-left: none; transform: rotate(45deg); }
-        """)
+        self.sample_rate_combo.setFixedWidth(170)
+        self.sample_rate_combo.setStyleSheet("QComboBox { padding-right: 20px; }")
         format_row.addWidget(self.sample_rate_combo)
 
         settings_outer.addLayout(format_row)
@@ -306,11 +298,10 @@ class MainWindow(QMainWindow):
         options_outer.addLayout(options_grid)
 
         parallel_row = QHBoxLayout()
-        self.parallel_cb = QCheckBox("Parallel")
+        parallel_row.setSpacing(4)
+        self.parallel_cb = QCheckBox("Parallel Workers:")
         self.parallel_cb.setChecked(self.config.get('parallel_processing', False))
         parallel_row.addWidget(self.parallel_cb)
-        parallel_row.addSpacing(8)
-        parallel_row.addWidget(QLabel("Workers:"))
         self.workers_combo = QComboBox()
         self.workers_combo.addItems(['Auto'] + [str(i) for i in range(1, (os.cpu_count() or 4) + 1)])
         workers_val = self.config.get('parallel_workers', 0)
@@ -318,7 +309,8 @@ class MainWindow(QMainWindow):
             self.workers_combo.setCurrentText('Auto')
         else:
             self.workers_combo.setCurrentText(str(workers_val))
-        self.workers_combo.setFixedWidth(70)
+        self.workers_combo.setFixedWidth(85)
+        self.workers_combo.setStyleSheet("QComboBox { padding-right: 20px; }")
         parallel_row.addWidget(self.workers_combo)
         parallel_row.addStretch()
         options_outer.addLayout(parallel_row)
