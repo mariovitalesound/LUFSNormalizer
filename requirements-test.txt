@@ -1,0 +1,8 @@
+# Test dependencies — no GUI (PySide6) or build (Pillow) packages needed.
+soundfile>=0.12.1
+pyloudnorm>=0.1.1
+numpy>=1.21.0
+soxr>=0.3.0
+scipy>=1.7.0
+watchdog>=3.0.0
+pytest>=7.0.0

@@ -64,7 +64,11 @@ class FolderWatcher:
         self._queue_lock = threading.Lock()
 
     def start(self):
-        """Start watching the folder."""
+        """Start watching the folder.
+
+        Queues any audio files already present in the watch directory before
+        starting the observer so the user doesn't have to re-drop existing files.
+        """
         if self._running:
             return
 
@@ -72,6 +76,14 @@ class FolderWatcher:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self._running = True
+
+        # Enqueue pre-existing files so watch mode is idempotent on restart
+        existing = self._scan_existing_files()
+        if existing:
+            logging.info(f"Found {len(existing)} existing audio file(s) in watch folder")
+            for path in existing:
+                self._queue_file(path)
+
         handler = _AudioFileHandler(self)
         self._observer = Observer()
         self._observer.schedule(handler, str(self.watch_dir), recursive=False)
@@ -81,6 +93,17 @@ class FolderWatcher:
         self._process_thread.start()
 
         logging.info(f"Watch started: {self.watch_dir}")
+
+    def _scan_existing_files(self):
+        """Return audio files already present in the watch directory (non-recursive)."""
+        files = []
+        try:
+            for entry in self.watch_dir.iterdir():
+                if entry.is_file() and entry.suffix.lower() in AUDIO_EXTENSIONS:
+                    files.append(entry)
+        except OSError as e:
+            logging.warning(f"Could not scan watch folder for existing files: {e}")
+        return sorted(files)
 
     def stop(self):
         """Stop watching."""

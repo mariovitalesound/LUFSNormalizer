@@ -46,6 +46,8 @@ class BatchWorker(QThread):
         self.embed_bwf = False
         self.parallel = False
         self.max_workers = None
+        self.recursive = False
+        self.dry_run = False
 
     def _on_progress(self, current, total, filename):
         self.progress.emit(current, total, filename)
@@ -75,6 +77,8 @@ class BatchWorker(QThread):
                         strict_lufs_matching=self.strict_lufs_matching,
                         embed_bwf=self.embed_bwf,
                         max_workers=self.max_workers,
+                        recursive=self.recursive,
+                        dry_run=self.dry_run,
                     )
             else:
                 success, total, log_path, csv_path, output_path = \
@@ -90,6 +94,8 @@ class BatchWorker(QThread):
                         generate_csv=self.generate_csv,
                         strict_lufs_matching=self.strict_lufs_matching,
                         embed_bwf=self.embed_bwf,
+                        recursive=self.recursive,
+                        dry_run=self.dry_run,
                     )
 
             self.finished.emit(

@@ -8,6 +8,7 @@ Large chunks (e.g. 'data') are stream-copied rather than loaded
 into memory, keeping RAM usage constant regardless of file size.
 """
 
+import math
 import struct
 import os
 import tempfile
@@ -158,10 +159,19 @@ def _build_bext_chunk(description="", originator="", originator_ref="",
     # UMID (64 bytes, zeroed)
     umid = b'\x00' * 64
 
-    # Loudness fields (int16, value * 100)
-    lv = struct.pack('<h', int(loudness_value * 100)) if loudness_value is not None else struct.pack('<h', 0)
-    lr = struct.pack('<h', int(loudness_range * 100)) if loudness_range is not None else struct.pack('<h', 0)
-    mtp = struct.pack('<h', int(max_true_peak * 100)) if max_true_peak is not None else struct.pack('<h', 0)
+    # Loudness fields (int16, value * 100). Non-finite values (-inf from silence,
+    # NaN from measurement failure) are written as 0 per EBU Tech 3285 "not measured".
+    def _loudness_int16(val):
+        if val is None or not math.isfinite(val):
+            return struct.pack('<h', 0)
+        scaled = int(round(val * 100))
+        # Clamp to int16 range (-32768..32767)
+        scaled = max(-32768, min(32767, scaled))
+        return struct.pack('<h', scaled)
+
+    lv = _loudness_int16(loudness_value)
+    lr = _loudness_int16(loudness_range)
+    mtp = _loudness_int16(max_true_peak)
 
     # MaxMomentaryLoudness and MaxShortTermLoudness (not measured, set to 0)
     mml = struct.pack('<h', 0)
@@ -279,16 +289,26 @@ def inject_ixml_chunk(wav_path, xml_string):
 
 def build_ixml_for_normalization(target_lufs, final_lufs, lra_lu, true_peak, version):
     """Build a minimal iXML string for normalization metadata."""
+    def _fmt(val):
+        if val is None:
+            return 'N/A'
+        try:
+            if not math.isfinite(float(val)):
+                return 'N/A'
+        except (TypeError, ValueError):
+            return 'N/A'
+        return str(val)
+
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <BWFXML>
   <IXML_VERSION>1.52</IXML_VERSION>
   <PROJECT>LUFS Normalizer</PROJECT>
   <NOTE>Normalized to {target_lufs} LUFS by LUFS Normalizer v{version}</NOTE>
   <USER>
-    <TARGET_LUFS>{target_lufs}</TARGET_LUFS>
-    <FINAL_LUFS>{final_lufs}</FINAL_LUFS>
-    <LRA_LU>{lra_lu if lra_lu is not None else 'N/A'}</LRA_LU>
-    <TRUE_PEAK_DBTP>{true_peak}</TRUE_PEAK_DBTP>
+    <TARGET_LUFS>{_fmt(target_lufs)}</TARGET_LUFS>
+    <FINAL_LUFS>{_fmt(final_lufs)}</FINAL_LUFS>
+    <LRA_LU>{_fmt(lra_lu)}</LRA_LU>
+    <TRUE_PEAK_DBTP>{_fmt(true_peak)}</TRUE_PEAK_DBTP>
   </USER>
 </BWFXML>"""
     return xml

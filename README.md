@@ -2,7 +2,7 @@
 
 Professional batch audio normalization for broadcast, game audio, and streaming. Normalizes WAV and AIFF files to industry-standard LUFS targets while respecting True Peak limits.
 
-**Version 3.0.4** | Author: Mario Vitale
+**Version 3.1.0** | Author: Mario Vitale
 
 ## Features
 
@@ -59,6 +59,14 @@ Gain is reduced to keep the True Peak at or below the ceiling. The final LUFS ma
 - **Output:** Same format as input (WAV stays WAV, AIFF stays AIFF)
 - **Bit depth:** Preserve, 16-bit, 24-bit, or 32-bit (TPDF dither applied when reducing)
 - **Sample rate:** Preserve, 44100 Hz, or 48000 Hz (downsampling only, requires SOXR)
+
+### Large-file streaming mode
+
+Files whose float64 in-memory footprint would exceed **2 GiB** (~46 minutes stereo 48 kHz) are automatically processed in constant-memory chunks. Memory usage stays bounded regardless of file duration.
+
+- Requires `scipy` (`pip install scipy`)
+- **Limitation:** sample rate conversion is not supported in streaming mode — normalize rate separately or omit the `--rate` flag
+- LRA is reported as empty for files processed in streaming mode
 
 ---
 
@@ -137,7 +145,7 @@ When enabled (`--bwf` on CLI, or the "Embed BWF metadata" checkbox in the GUI), 
 
 | Field | Value |
 |---|---|
-| Description | `Normalized to -23.0 LUFS by LUFS Normalizer v3.0.4` |
+| Description | `Normalized to -23.0 LUFS by LUFS Normalizer v3.1.0` |
 | Originator | `LUFS Normalizer` |
 | OriginatorReference | `LN302` |
 | OriginationDate | Processing date (yyyy-mm-dd) |
@@ -152,7 +160,7 @@ When enabled (`--bwf` on CLI, or the "Embed BWF metadata" checkbox in the GUI), 
 <BWFXML>
   <IXML_VERSION>1.52</IXML_VERSION>
   <PROJECT>LUFS Normalizer</PROJECT>
-  <NOTE>Normalized to -23.0 LUFS by LUFS Normalizer v3.0.4</NOTE>
+  <NOTE>Normalized to -23.0 LUFS by LUFS Normalizer v3.1.0</NOTE>
   <USER>
     <TARGET_LUFS>-23.0</TARGET_LUFS>
     <FINAL_LUFS>-23.01</FINAL_LUFS>
@@ -253,13 +261,13 @@ New `.wav` and `.aiff` files dropped into the watch folder are automatically det
 build.bat
 ```
 
-This installs build dependencies, generates the application icon via `create_icon.py`, and runs PyInstaller to produce a single-file exe. The distribution is written to `dist/LUFSNormalizer_v3.0.4/` with the exe, `config.json`, and icon files.
+This installs build dependencies, generates the application icon via `create_icon.py`, and runs PyInstaller to produce a single-file exe. The distribution is written to `dist/LUFSNormalizer_v3.1.0/` with the exe, `config.json`, and icon files.
 
 ### Manual build
 
 ```bash
 pip install pyinstaller
-pyinstaller LUFSNormalizer_v3.0.4.spec
+pyinstaller LUFSNormalizer_v3.1.0.spec
 ```
 
 The spec file bundles `config.json`, the `lufs_normalizer` package, and hidden imports for PySide6, soundfile, pyloudnorm, soxr, numpy, and watchdog.
@@ -291,7 +299,7 @@ pip install -r requirements.txt
 | `PySide6` | GUI framework | Yes (GUI mode) |
 | `soxr` | Resampling and True Peak oversampling | Recommended |
 | `watchdog` | Watch folder file monitoring | Optional |
-| `scipy` | Fallback True Peak oversampling if soxr absent | Optional |
+| `scipy` | Fallback True Peak oversampling if soxr absent; **required for large-file streaming mode** | Optional |
 | `Pillow` | Icon generation at build time | Build only |
 
 ### Run
@@ -317,6 +325,22 @@ python normalize_gui_modern.py
 | Shift + Up / Down | Adjust LUFS target by 0.1 |
 
 ---
+
+## Testing
+
+```bash
+pip install -r requirements-test.txt
+pytest
+```
+
+`requirements-test.txt` contains only the packages needed to run the suite (no PySide6 or Pillow). CI runs the same command on Ubuntu and Windows across Python 3.9 / 3.11 / 3.13 via GitHub Actions (`.github/workflows/test.yml`).
+
+The suite (~113 tests) generates audio fixtures on the fly — no binary
+test files in the repo. It covers BS.1770 measurement against reference
+values, TPDF dither distribution, BWF/iXML round-trips, every branch of
+`process_single_file`, parallel-vs-sequential consistency, the watch
+folder pipeline (including pre-existing file scan-on-start), and the
+large-file streaming path (chunked K-weighting and write).
 
 ## Credits
 

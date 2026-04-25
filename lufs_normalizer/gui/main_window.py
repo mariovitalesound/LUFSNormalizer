@@ -295,6 +295,16 @@ class MainWindow(QMainWindow):
         self.embed_bwf_cb.setChecked(self.config.get('embed_bwf', False))
         options_grid.addWidget(self.embed_bwf_cb, 2, 0)
 
+        self.recursive_cb = QCheckBox("Scan subfolders (recursive)")
+        self.recursive_cb.setChecked(self.config.get('recursive', False))
+        self.recursive_cb.stateChanged.connect(self._update_file_count)
+        options_grid.addWidget(self.recursive_cb, 2, 1)
+
+        self.dry_run_cb = QCheckBox("Dry run (measure only, no output)")
+        self.dry_run_cb.setChecked(self.config.get('dry_run', False))
+        self.dry_run_cb.stateChanged.connect(self._update_file_count)
+        options_grid.addWidget(self.dry_run_cb, 3, 0)
+
         options_outer.addLayout(options_grid)
 
         parallel_row = QHBoxLayout()
@@ -491,17 +501,22 @@ class MainWindow(QMainWindow):
         input_folder = self.input_entry.text()
         if input_folder and Path(input_folder).exists():
             input_path = Path(input_folder)
+            recursive = getattr(self, 'recursive_cb', None) and self.recursive_cb.isChecked()
+            glob_fn = input_path.rglob if recursive else input_path.glob
             seen = set()
             for pattern in ('*.wav', '*.WAV', '*.aiff', '*.AIFF', '*.aif', '*.AIF'):
-                for f in input_path.glob(pattern):
+                for f in glob_fn(pattern):
                     seen.add(f.resolve())
             count = len(seen)
+            dry = getattr(self, 'dry_run_cb', None) and self.dry_run_cb.isChecked()
+            label = "Dry Run" if dry else "Start Processing"
             self.file_count_label.setText(f"{count} audio files found")
-            self.start_btn.setText(f"Start Processing ({count})")
+            self.start_btn.setText(f"{label} ({count})")
             self._file_count = count
         else:
             self.file_count_label.setText("No folder selected")
-            self.start_btn.setText("Start Processing")
+            dry = getattr(self, 'dry_run_cb', None) and self.dry_run_cb.isChecked()
+            self.start_btn.setText("Dry Run" if dry else "Start Processing")
             self._file_count = 0
 
     # ── Processing ──
@@ -559,6 +574,8 @@ class MainWindow(QMainWindow):
         self.worker.generate_csv = self.generate_csv_cb.isChecked()
         self.worker.strict_lufs_matching = self.strict_radio.isChecked()
         self.worker.embed_bwf = self.embed_bwf_cb.isChecked()
+        self.worker.recursive = self.recursive_cb.isChecked()
+        self.worker.dry_run = self.dry_run_cb.isChecked()
         self.worker.parallel = self.parallel_cb.isChecked()
 
         workers_text = self.workers_combo.currentText()
@@ -727,6 +744,8 @@ class MainWindow(QMainWindow):
             'generate_log': self.generate_log_cb.isChecked(),
             'generate_csv': self.generate_csv_cb.isChecked(),
             'embed_bwf': self.embed_bwf_cb.isChecked(),
+            'recursive': self.recursive_cb.isChecked(),
+            'dry_run': self.dry_run_cb.isChecked(),
             'parallel_processing': self.parallel_cb.isChecked(),
             'parallel_workers': 0 if self.workers_combo.currentText() == 'Auto'
                                 else int(self.workers_combo.currentText()),

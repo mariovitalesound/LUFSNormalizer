@@ -2,13 +2,18 @@
 dist/
 build/
 *.spec
-!LUFSNormalizer_v3.0.4.spec
+!LUFSNormalizer_v3.1.0.spec
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Test directories
 test_input/

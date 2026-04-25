@@ -47,6 +47,14 @@ Files that would exceed peak ceiling are SKIPPED and copied to a
     parser.add_argument('--workers', type=int, default=0,
                         help='Number of parallel workers (default: CPU count)')
 
+    # Recursive scanning
+    parser.add_argument('--recursive', action='store_true',
+                        help='Scan subdirectories; mirror folder hierarchy in output')
+
+    # Dry run
+    parser.add_argument('--dry-run', action='store_true',
+                        help='Measure only — no output files written, produces dry_run_report.csv')
+
     # Watch mode
     parser.add_argument('--watch', action='store_true',
                         help='Watch folder mode: auto-process new files')
@@ -81,6 +89,8 @@ def _run_batch_mode(args, sr):
             strict_lufs_matching=not args.drift,
             embed_bwf=args.bwf,
             max_workers=workers,
+            recursive=args.recursive,
+            dry_run=args.dry_run,
         )
     else:
         normalizer.normalize_batch(
@@ -95,6 +105,8 @@ def _run_batch_mode(args, sr):
             generate_csv=not args.no_csv,
             strict_lufs_matching=not args.drift,
             embed_bwf=args.bwf,
+            recursive=args.recursive,
+            dry_run=args.dry_run,
         )
 
 

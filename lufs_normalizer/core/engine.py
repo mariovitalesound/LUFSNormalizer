@@ -35,6 +35,7 @@ class LUFSNormalizer:
         self.errors = []
         self.skipped_files = []
         self.skipped_silent = []
+        self.dry_run_results = []
 
     def set_progress_callback(self, callback):
         """Set callback for progress updates: callback(current, total, filename)"""
@@ -50,13 +51,14 @@ class LUFSNormalizer:
         if hasattr(self, '_stop_event') and self._stop_event is not None:
             self._stop_event.set()
 
-    def _find_audio_files(self, input_dir):
-        """Find all WAV and AIFF files in input directory, deduplicated."""
+    def _find_audio_files(self, input_dir, recursive=False):
+        """Find WAV and AIFF files in input directory, optionally recursing into subdirs."""
         input_path = Path(input_dir)
+        glob_fn = input_path.rglob if recursive else input_path.glob
         seen = set()
         files = []
         for pattern in ('*.wav', '*.WAV', '*.aiff', '*.AIFF', '*.aif', '*.AIF'):
-            for f in input_path.glob(pattern):
+            for f in glob_fn(pattern):
                 resolved = f.resolve()
                 if resolved not in seen:
                     seen.add(resolved)
@@ -154,6 +156,15 @@ class LUFSNormalizer:
             if self.result_callback:
                 self.result_callback(filename, 'BLOCKED', error_msg)
 
+        elif rtype == 'dry_run':
+            self.dry_run_results.append(result['result'])
+            status = result['result']['predicted_status']
+            gain = result['result']['gain_needed_db']
+            peak = result['result']['predicted_peak_dBTP']
+            if self.result_callback:
+                self.result_callback(filename, f'DRY_RUN_{status}',
+                                     f'Gain: {gain:+.1f}dB | Peak: {peak:.1f}dBTP')
+
         elif rtype == 'error':
             self.errors.append(result['error'])
             error_msg = result['error']['error']
@@ -183,6 +194,19 @@ class LUFSNormalizer:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(self.skipped_files)
+
+        if generate_csv and self.dry_run_results:
+            logs_path.mkdir(parents=True, exist_ok=True)
+            dry_csv = logs_path / 'dry_run_report.csv'
+            with open(dry_csv, 'w', newline='') as f:
+                fieldnames = ['filename', 'original_lufs', 'target_lufs',
+                              'gain_needed_db', 'predicted_peak_dBTP',
+                              'predicted_status', 'lra_lu', 'reason']
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(self.dry_run_results)
+            if csv_path is None:
+                csv_path = dry_csv
 
         return csv_path
 
@@ -214,9 +238,15 @@ class LUFSNormalizer:
     def normalize_batch(self, input_dir, output_dir, target_lufs=-23.0, peak_ceiling=-1.0,
                         bit_depth='preserve', sample_rate='preserve',
                         use_batch_folders=True, generate_log=True, generate_csv=True,
-                        strict_lufs_matching=True, embed_bwf=False):
+                        strict_lufs_matching=True, embed_bwf=False, recursive=False,
+                        dry_run=False):
         """
         Normalize a batch of audio files sequentially.
+
+        When recursive=True, subdirectories are scanned and the output mirrors
+        the input folder hierarchy under normalized_path.
+        When dry_run=True, files are measured but no output is written; a
+        dry_run_report.csv is produced showing predicted gain and peak values.
 
         Returns:
             tuple: (success_count, total_count, log_path, csv_path, output_path)
@@ -226,8 +256,10 @@ class LUFSNormalizer:
         self.errors = []
         self.skipped_files = []
         self.skipped_silent = []
+        self.dry_run_results = []
 
-        audio_files = self._find_audio_files(input_dir)
+        input_path = Path(input_dir)
+        audio_files = self._find_audio_files(input_dir, recursive=recursive)
         if not audio_files:
             logger.warning("No WAV or AIFF files found in input directory")
             return 0, 0, None, None, None
@@ -246,6 +278,9 @@ class LUFSNormalizer:
         logger.info(f"Bit Depth: {bit_depth}")
         logger.info(f"Sample Rate: {sample_rate}")
         logger.info(f"BWF Metadata: {'Yes' if embed_bwf else 'No'}")
+        logger.info(f"Recursive: {'Yes' if recursive else 'No'}")
+        if dry_run:
+            logger.info("*** DRY RUN — measuring only, no output files will be written ***")
         logger.info(f"Files to process: {total_files}")
         logger.info("-" * 70)
 
@@ -258,6 +293,13 @@ class LUFSNormalizer:
             if self.progress_callback:
                 self.progress_callback(idx, total_files, audio_path.name)
 
+            # Mirror subdirectory structure when running recursively
+            if recursive:
+                rel_parent = audio_path.relative_to(input_path).parent
+                file_normalized_path = normalized_path / rel_parent
+            else:
+                file_normalized_path = normalized_path
+
             result = process_single_file(
                 audio_path=str(audio_path),
                 target_lufs=target_lufs,
@@ -265,10 +307,11 @@ class LUFSNormalizer:
                 strict_lufs_matching=strict_lufs_matching,
                 bit_depth=bit_depth,
                 sample_rate=sample_rate,
-                normalized_path=str(normalized_path),
+                normalized_path=str(file_normalized_path),
                 needs_limiting_path=str(needs_limiting_path),
                 embed_bwf=embed_bwf,
                 rng_seed=idx,
+                dry_run=dry_run,
             )
             self._process_result(result, idx, total_files)
 
@@ -286,12 +329,14 @@ class LUFSNormalizer:
                                   sample_rate='preserve', use_batch_folders=True,
                                   generate_log=True, generate_csv=True,
                                   strict_lufs_matching=True, embed_bwf=False,
-                                  max_workers=None):
+                                  max_workers=None, recursive=False, dry_run=False):
         """
         Normalize a batch of audio files in parallel using ProcessPoolExecutor.
 
         Args:
             max_workers: Number of parallel workers (default: CPU count)
+            recursive: Scan subdirectories and mirror hierarchy in output
+            dry_run: Measure only — no output written, dry_run_report.csv produced
             (all other args same as normalize_batch)
 
         Returns:
@@ -303,8 +348,10 @@ class LUFSNormalizer:
         self.errors = []
         self.skipped_files = []
         self.skipped_silent = []
+        self.dry_run_results = []
 
-        audio_files = self._find_audio_files(input_dir)
+        input_path = Path(input_dir)
+        audio_files = self._find_audio_files(input_dir, recursive=recursive)
         if not audio_files:
             logger.warning("No WAV or AIFF files found in input directory")
             return 0, 0, None, None, None
@@ -324,6 +371,9 @@ class LUFSNormalizer:
         logger.info(f"Peak Ceiling: {peak_ceiling} dBTP")
         logger.info(f"Workers: {max_workers}")
         logger.info(f"BWF Metadata: {'Yes' if embed_bwf else 'No'}")
+        logger.info(f"Recursive: {'Yes' if recursive else 'No'}")
+        if dry_run:
+            logger.info("*** DRY RUN — measuring only, no output files will be written ***")
         logger.info(f"Files to process: {total_files}")
         logger.info("-" * 70)
 
@@ -332,6 +382,12 @@ class LUFSNormalizer:
             # Submit all tasks
             future_to_info = {}
             for idx, audio_path in enumerate(audio_files, 1):
+                if recursive:
+                    rel_parent = audio_path.relative_to(input_path).parent
+                    file_normalized_path = normalized_path / rel_parent
+                else:
+                    file_normalized_path = normalized_path
+
                 future = executor.submit(
                     process_single_file,
                     audio_path=str(audio_path),
@@ -340,10 +396,11 @@ class LUFSNormalizer:
                     strict_lufs_matching=strict_lufs_matching,
                     bit_depth=bit_depth,
                     sample_rate=sample_rate,
-                    normalized_path=str(normalized_path),
+                    normalized_path=str(file_normalized_path),
                     needs_limiting_path=str(needs_limiting_path),
                     embed_bwf=embed_bwf,
                     rng_seed=idx,
+                    dry_run=dry_run,
                 )
                 future_to_info[future] = (idx, audio_path)
 
