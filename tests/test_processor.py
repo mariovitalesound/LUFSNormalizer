@@ -334,6 +334,42 @@ class TestSampleRateConversion:
         assert res['type'] == 'needs_limiting'
         assert res['skipped']['reason'] == 'would_exceed_peak_ceiling'
 
+    def test_post_dither_peak_reclassifies_strict(self, make_wav, out_dirs, monkeypatch):
+        """Strict, no SRC: file passes the pre-SRC ceiling check but its measured
+        peak exceeds the ceiling AFTER bit-depth dither/quantization → moved to
+        needs_limiting/ with reason 'exceeded_post_dither', removed from normalized/."""
+        import lufs_normalizer.core.processor as proc
+
+        # No SRC (sample_rate='preserve') means both true-peak calls use the same
+        # rate, so key on call order instead: 1st call = pre-SRC prediction (below
+        # ceiling → file written), 2nd call = final measurement (above ceiling).
+        calls = {'n': 0}
+        def fake_tp(data, sr):
+            calls['n'] += 1
+            return -2.0 if calls['n'] == 1 else -0.3
+        monkeypatch.setattr(proc, 'measure_true_peak', fake_tp)
+
+        norm_dir, nl_dir = out_dirs
+        in_path = make_wav(lufs=-18.0, channels=2, subtype='PCM_24')
+
+        res = process_single_file(
+            str(in_path), target_lufs=-23.0, peak_ceiling=-1.0,
+            strict_lufs_matching=True, bit_depth='16', sample_rate='preserve',
+            normalized_path=norm_dir, needs_limiting_path=nl_dir, rng_seed=1,
+        )
+
+        assert res['type'] == 'needs_limiting', f"got {res['type']}: {res}"
+        assert res['skipped']['reason'] == 'exceeded_post_dither'
+        assert res['skipped']['predicted_peak_dBTP'] == -0.3
+
+        from pathlib import Path
+        out = Path(res['output_file'])
+        assert 'needs_limiting' in str(out).replace('\\', '/')
+        assert out.exists(), "file must be present in needs_limiting/"
+        # Not left behind in normalized/
+        assert list(Path(norm_dir).glob('*_-23LUFS.wav')) == [], \
+            "output must be removed from normalized/ after relocation"
+
 
 class TestBitDepth:
     def test_explicit_16_writes_16(self, make_wav, out_dirs):

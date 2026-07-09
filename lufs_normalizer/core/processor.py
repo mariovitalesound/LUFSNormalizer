@@ -383,23 +383,26 @@ def process_single_file(audio_path, target_lufs, peak_ceiling, strict_lufs_match
         # The pre-existing pre-SRC needs_limiting path instead relocates the
         # original, unprocessed SOURCE file. Both land in needs_limiting/ but
         # represent different things. Downstream tooling must check the CSV
-        # 'reason' column (would_exceed_peak_ceiling vs exceeded_post_src) to
-        # know which kind of file it's handling.
-        # Post-SRC peak safety net (strict mode only). The pre-SRC ceiling check
-        # used the true peak at the ORIGINAL rate; sample-rate conversion can
-        # raise the measured true peak. If the file was actually resampled and
-        # its true peak now exceeds the ceiling, relocate it to needs_limiting/
-        # and reclassify. The 0.05 dBTP tolerance absorbs measurement noise.
+        # 'reason' column (would_exceed_peak_ceiling vs exceeded_post_src vs
+        # exceeded_post_dither) to know which kind of file it's handling.
+        # Post-processing peak safety net (strict mode only). The pre-SRC ceiling
+        # check used the true peak at the ORIGINAL rate/bit-depth; sample-rate
+        # conversion AND bit-depth dithering/quantization can each raise the
+        # measured true peak. If the written file's true peak now exceeds the
+        # ceiling, relocate it to needs_limiting/ and reclassify — src_converted
+        # distinguishes the two causes. The 0.05 dBTP tolerance absorbs noise.
         src_converted = output_rate != rate
-        if (src_converted and strict_lufs_matching
-                and final_true_peak > peak_ceiling + 0.05):
+        if strict_lufs_matching and final_true_peak > peak_ceiling + 0.05:
+            reason = 'exceeded_post_src' if src_converted else 'exceeded_post_dither'
+            cause = (f"{rate}->{output_rate}Hz conversion" if src_converted
+                     else "bit-depth dither/quantization")
             needs_limiting_path.mkdir(parents=True, exist_ok=True)
             nl_dest = needs_limiting_path / output_file.name
             shutil.move(str(output_file), str(nl_dest))
 
-            log('error', f"NEEDS LIMITING (post-SRC): {audio_path.name} | "
-                f"Measured {final_true_peak:.1f}dBTP after {rate}->{output_rate}Hz "
-                f"conversion (ceiling: {peak_ceiling}dBTP) | Moved to needs_limiting/")
+            log('error', f"NEEDS LIMITING (post-processing): {audio_path.name} | "
+                f"Measured {final_true_peak:.1f}dBTP after {cause} "
+                f"(ceiling: {peak_ceiling}dBTP) | Moved to needs_limiting/")
 
             return {
                 'type': 'needs_limiting',
@@ -410,7 +413,7 @@ def process_single_file(audio_path, target_lufs, peak_ceiling, strict_lufs_match
                     'predicted_peak_dBTP': round(final_true_peak, 2),
                     'gain_needed_db': round(gain_db, 2),
                     'lra_lu': output_lra if output_lra is not None else '',
-                    'reason': 'exceeded_post_src',
+                    'reason': reason,
                 },
                 'output_file': str(nl_dest),
                 'log_messages': log_messages,
