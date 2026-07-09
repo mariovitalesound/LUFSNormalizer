@@ -350,4 +350,6 @@ Developed by Mario Vitale
 
 ## License
 
-MIT License
+PolyForm Noncommercial License 1.0.0
+
+Required Notice: Copyright Mario Vitale (https://github.com/vitaleaudio/LUFSNormalizer)
