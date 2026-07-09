@@ -368,6 +368,11 @@ class TestSampleRateConversion:
         # Not left behind in normalized/
         assert list(Path(norm_dir).glob('*_-23LUFS.wav')) == [], \
             "output must be removed from normalized/ after relocation"
+        # Raw-source contract: needs_limiting/ holds the ORIGINAL source, not the
+        # processed output — same name as the input and byte-identical to it.
+        assert out.name == in_path.name, "needs_limiting file must keep the source name"
+        assert out.read_bytes() == in_path.read_bytes(), \
+            "needs_limiting file must be the raw source, not the processed output"
 
     def test_post_src_check_skipped_when_no_conversion(self, make_wav, out_dirs, monkeypatch):
         """No SRC (sample_rate='preserve') → the new post-SRC reclassification
@@ -421,6 +426,11 @@ class TestSampleRateConversion:
         # Not left behind in normalized/
         assert list(Path(norm_dir).glob('*_-23LUFS.wav')) == [], \
             "output must be removed from normalized/ after relocation"
+        # Raw-source contract: needs_limiting/ holds the ORIGINAL source, not the
+        # processed output — same name as the input and byte-identical to it.
+        assert out.name == in_path.name, "needs_limiting file must keep the source name"
+        assert out.read_bytes() == in_path.read_bytes(), \
+            "needs_limiting file must be the raw source, not the processed output"
 
 
 class TestBitDepth:
