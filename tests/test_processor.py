@@ -283,6 +283,57 @@ class TestSampleRateConversion:
         assert res['type'] == 'blocked'
         assert res['error']['reason'] == 'src_missing_dependency'
 
+    def test_post_src_peak_reclassifies_strict(self, make_wav, out_dirs, monkeypatch):
+        """Strict: file passes the pre-SRC ceiling check but its measured peak
+        exceeds the ceiling AFTER downsampling → moved to needs_limiting/ with
+        reason 'exceeded_post_src', and removed from normalized/."""
+        import lufs_normalizer.core.processor as proc
+
+        # TP below ceiling at the original 48k rate (pre-SRC check passes),
+        # above ceiling at the 44.1k target rate (post-SRC check must fire).
+        def fake_tp(data, sr):
+            return -0.3 if sr == 44100 else -2.0
+        monkeypatch.setattr(proc, 'measure_true_peak', fake_tp)
+
+        norm_dir, nl_dir = out_dirs
+        in_path = make_wav(lufs=-18.0, channels=2, sample_rate=48000, subtype='PCM_24')
+
+        res = process_single_file(
+            str(in_path), target_lufs=-23.0, peak_ceiling=-1.0,
+            strict_lufs_matching=True, bit_depth='preserve',
+            sample_rate='44100 Hz',
+            normalized_path=norm_dir, needs_limiting_path=nl_dir, rng_seed=1,
+        )
+
+        assert res['type'] == 'needs_limiting', f"got {res['type']}: {res}"
+        assert res['skipped']['reason'] == 'exceeded_post_src'
+        assert res['skipped']['predicted_peak_dBTP'] == -0.3
+
+        from pathlib import Path
+        out = Path(res['output_file'])
+        assert 'needs_limiting' in str(out).replace('\\', '/')
+        assert out.exists(), "file must be present in needs_limiting/"
+        # Not left behind in normalized/
+        assert list(Path(norm_dir).glob('*_-23LUFS.wav')) == [], \
+            "output must be removed from normalized/ after relocation"
+
+    def test_post_src_check_skipped_when_no_conversion(self, make_wav, out_dirs, monkeypatch):
+        """No SRC (sample_rate='preserve') → the new post-SRC reclassification
+        branch never fires; the existing pre-SRC check owns the decision, so the
+        reason stays 'would_exceed_peak_ceiling' (not 'exceeded_post_src')."""
+        import lufs_normalizer.core.processor as proc
+        monkeypatch.setattr(proc, 'measure_true_peak', lambda data, sr: -0.3)
+
+        norm_dir, nl_dir = out_dirs
+        in_path = make_wav(lufs=-18.0, channels=2, subtype='PCM_24')
+        res = process_single_file(
+            str(in_path), target_lufs=-23.0, peak_ceiling=-1.0,
+            strict_lufs_matching=True, bit_depth='preserve', sample_rate='preserve',
+            normalized_path=norm_dir, needs_limiting_path=nl_dir, rng_seed=1,
+        )
+        assert res['type'] == 'needs_limiting'
+        assert res['skipped']['reason'] == 'would_exceed_peak_ceiling'
+
 
 class TestBitDepth:
     def test_explicit_16_writes_16(self, make_wav, out_dirs):
