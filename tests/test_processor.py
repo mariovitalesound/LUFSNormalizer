@@ -169,6 +169,58 @@ class TestDriftMode:
         final_lufs = res['result']['final_lufs']
         assert final_lufs < -9.0 - 1.0, f"expected undershoot below -10, got {final_lufs}"
 
+    def test_post_src_peak_ships_with_status_drift(self, make_wav, out_dirs, monkeypatch):
+        """Drift + SRC: final peak over ceiling after downsample → file ships in
+        normalized/ (not moved) with status OK_PEAK_EXCEEDED_POST_SRC."""
+        import lufs_normalizer.core.processor as proc
+        def fake_tp(data, sr):
+            return -0.3 if sr == 44100 else -2.0
+        monkeypatch.setattr(proc, 'measure_true_peak', fake_tp)
+
+        norm_dir, nl_dir = out_dirs
+        in_path = make_wav(lufs=-18.0, channels=2, sample_rate=48000, subtype='PCM_24')
+        res = process_single_file(
+            str(in_path), target_lufs=-23.0, peak_ceiling=-1.0,
+            strict_lufs_matching=False, bit_depth='preserve',
+            sample_rate='44100 Hz',
+            normalized_path=norm_dir, needs_limiting_path=nl_dir, rng_seed=1,
+        )
+        assert res['type'] == 'success', f"got {res['type']}: {res}"
+        assert res['result']['status'] == 'OK_PEAK_EXCEEDED_POST_SRC'
+        assert res['result']['reason'] == 'exceeded_post_src'
+        assert res['result']['true_peak_dBTP'] == -0.3
+
+        from pathlib import Path
+        out = Path(res['output_file'])
+        assert 'needs_limiting' not in str(out).replace('\\', '/')
+        assert out.exists() and out.parent == Path(norm_dir), "file must stay in normalized/"
+
+    def test_post_dither_peak_ships_with_status_drift(self, make_wav, out_dirs, monkeypatch):
+        """Drift, no SRC: final peak over ceiling after 16-bit dither → file ships
+        in normalized/ with status OK_PEAK_EXCEEDED_POST_DITHER."""
+        import lufs_normalizer.core.processor as proc
+        calls = {'n': 0}
+        def fake_tp(data, sr):
+            calls['n'] += 1
+            return -2.0 if calls['n'] == 1 else -0.3
+        monkeypatch.setattr(proc, 'measure_true_peak', fake_tp)
+
+        norm_dir, nl_dir = out_dirs
+        in_path = make_wav(lufs=-18.0, channels=2, subtype='PCM_24')
+        res = process_single_file(
+            str(in_path), target_lufs=-23.0, peak_ceiling=-1.0,
+            strict_lufs_matching=False, bit_depth='16', sample_rate='preserve',
+            normalized_path=norm_dir, needs_limiting_path=nl_dir, rng_seed=1,
+        )
+        assert res['type'] == 'success', f"got {res['type']}: {res}"
+        assert res['result']['status'] == 'OK_PEAK_EXCEEDED_POST_DITHER'
+        assert res['result']['reason'] == 'exceeded_post_dither'
+        assert res['result']['true_peak_dBTP'] == -0.3
+
+        from pathlib import Path
+        out = Path(res['output_file'])
+        assert out.exists() and out.parent == Path(norm_dir), "file must stay in normalized/"
+
 
 class TestMultichannelRejection:
     def test_six_channel_blocked(self, surround_wav, out_dirs):

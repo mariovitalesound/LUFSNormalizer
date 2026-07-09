@@ -437,7 +437,25 @@ def process_single_file(audio_path, target_lufs, peak_ceiling, strict_lufs_match
 
         # Determine status
         lufs_undershoot = abs(final_lufs - target_lufs) > 0.5
-        if lufs_undershoot and not strict_lufs_matching:
+        # Drift mode always ships the file (no relocation), but if SRC or dither
+        # pushed the final measured true peak over the ceiling despite the pre-SRC
+        # gain cap, report it honestly instead of OK/OK_UNDERSHOOT. Same +0.05 dBTP
+        # tolerance and src_converted split as the strict-mode safety net above.
+        # (Strict mode never reaches here over-ceiling — it returned/relocated.)
+        drift_peak_exceeded = (not strict_lufs_matching
+                               and final_true_peak > peak_ceiling + 0.05)
+        if drift_peak_exceeded:
+            if src_converted:
+                status = 'OK_PEAK_EXCEEDED_POST_SRC'
+                reason = 'exceeded_post_src'
+            else:
+                status = 'OK_PEAK_EXCEEDED_POST_DITHER'
+                reason = 'exceeded_post_dither'
+            log('warning', f"PEAK EXCEEDED (drift): {audio_path.name} | "
+                f"Measured {final_true_peak:.1f}dBTP > ceiling {peak_ceiling}dBTP "
+                f"after {'SRC' if src_converted else 'dither/quantization'} | "
+                f"Shipped as-is (drift mode)")
+        elif lufs_undershoot and not strict_lufs_matching:
             status = 'OK_UNDERSHOOT'
             reason = 'peak_limited'
             log('info', f"SUCCESS (UNDERSHOOT): {audio_path.name} | "
